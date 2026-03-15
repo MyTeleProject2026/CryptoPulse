@@ -14,7 +14,7 @@ const db = mysql.createPool({
 
   ssl: {
     minVersion: "TLSv1.2",
-    rejectUnauthorized: true
+    rejectUnauthorized: false
   },
 
   enableKeepAlive: true,
@@ -22,20 +22,6 @@ const db = mysql.createPool({
   charset: "utf8mb4",
   timezone: "Z",
   connectTimeout: 10000
-});
-
-db.getConnection((err, connection) => {
-  if (err) {
-    console.error("❌ TiDB connection failed:", err.message);
-    return;
-  }
-
-  console.log("✅ TiDB Connected Successfully");
-  connection.release();
-});
-
-db.on("error", (err) => {
-  console.error("Database Pool Error:", err);
 });
 
 module.exports = db;
