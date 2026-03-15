@@ -24,4 +24,18 @@ const db = mysql.createPool({
   connectTimeout: 10000
 });
 
+db.getConnection((err, connection) => {
+  if (err) {
+    console.error("❌ TiDB startup connection failed:", err.message);
+    return;
+  }
+
+  console.log("✅ TiDB Connected Successfully");
+  connection.release();
+});
+
+db.on("error", (err) => {
+  console.error("Database Pool Error:", err.message);
+});
+
 module.exports = db;
