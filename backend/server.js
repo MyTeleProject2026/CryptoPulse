@@ -1,0 +1,420 @@
+const express = require("express");
+const cors = require("cors");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const axios = require("axios");
+const helmet = require("helmet");
+const morgan = require("morgan");
+const rateLimit = require("express-rate-limit");
+require("dotenv").config();
+const db = require("./db");
+
+const app = express();
+const PORT = process.env.PORT || 5000;
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+  throw new Error("JWT_SECRET missing in .env");
+}
+
+/* ================================
+   SECURITY MIDDLEWARE
+================================ */
+
+app.use(helmet());
+app.use(cors());
+app.use(express.json());
+app.use(morgan("dev"));
+
+/* ================================
+   RATE LIMITERS
+================================ */
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { message: "Too many login attempts. Try later." },
+});
+
+const tradeLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  message: { message: "Too many trades. Slow down." },
+});
+
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+});
+
+app.use(apiLimiter);
+
+/* ================================
+   TOKEN SETTINGS
+================================ */
+
+const ACCESS_TOKEN_EXPIRES = "15m";
+const REFRESH_TOKEN_DAYS = 7;
+
+function generateAccessToken(payload) {
+  return jwt.sign(payload, JWT_SECRET, {
+    expiresIn: ACCESS_TOKEN_EXPIRES,
+  });
+}
+
+function generateRefreshToken() {
+  return jwt.sign(
+    { type: "refresh", rand: Math.random().toString(36).slice(2) },
+    JWT_SECRET,
+    { expiresIn: `${REFRESH_TOKEN_DAYS}d` }
+  );
+}
+
+/* ================================
+   AUTH MIDDLEWARE
+================================ */
+
+function authenticateToken(req, res, next) {
+  const header = req.headers.authorization;
+  const token = header && header.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).json({ message: "Access denied" });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({ message: "Invalid token" });
+    }
+    req.user = user;
+    next();
+  });
+}
+
+/* ================================
+   BINANCE PRICE HELPER
+================================ */
+
+async function getBinancePrice(symbol) {
+  try {
+    const response = await axios.get(
+      "https://api.binance.com/api/v3/ticker/price",
+      {
+        params: { symbol },
+        timeout: 5000,
+      }
+    );
+
+    if (!response.data || !response.data.price) {
+      throw new Error("Invalid price response");
+    }
+
+    return Number(response.data.price);
+  } catch (err) {
+    console.error("Binance price error:", err.message);
+    throw new Error("Market price unavailable");
+  }
+}
+
+/* ================================
+   TRADE CLOSING ENGINE
+================================ */
+
+async function closeTrade(trade) {
+  try {
+    const closePrice = await getBinancePrice(trade.pair);
+
+    let result = "lose";
+    let payout = 0;
+
+    const amount = Number(trade.amount);
+    const entry = Number(trade.entry_price);
+    const percent = Number(trade.profit_percent);
+
+    if (
+      (trade.direction === "bullish" && closePrice > entry) ||
+      (trade.direction === "bearish" && closePrice < entry)
+    ) {
+      payout = amount + (amount * percent) / 100;
+      result = "win";
+
+      db.query(
+        "UPDATE users SET balance = balance + ? WHERE id = ?",
+        [payout, trade.user_id],
+        (err) => {
+          if (err) {
+            console.error("User balance update error:", err.message);
+          }
+        }
+      );
+    }
+
+    db.query(
+      "UPDATE trades SET result=?, status='closed', close_price=?, closed_at=NOW() WHERE id=?",
+      [result, closePrice, trade.id],
+      (err) => {
+        if (err) {
+          console.error("Trade update error:", err.message);
+        }
+      }
+    );
+  } catch (err) {
+    console.error("Trade close error:", err.message);
+  }
+}
+
+function processOpenTrades() {
+  db.query(
+    "SELECT * FROM trades WHERE status='open' AND end_time <= NOW() LIMIT 20",
+    async (err, trades) => {
+      if (err) {
+        console.error("Trade scan error:", err.message);
+        return;
+      }
+
+      for (const trade of trades) {
+        await closeTrade(trade);
+      }
+    }
+  );
+}
+
+/* ================================
+   CLEAN EXPIRED TOKENS
+================================ */
+
+function cleanExpiredTokens() {
+  db.query(
+    "DELETE FROM refresh_tokens WHERE expires_at < NOW()",
+    (err) => {
+      if (err) {
+        console.error("Token cleanup error:", err.message);
+      }
+    }
+  );
+}
+
+/* ================================
+   BASIC ROUTES
+================================ */
+
+app.get("/", (req, res) => {
+  res.send("CryptoPulse API Running 🚀");
+});
+
+app.get("/health", (req, res) => {
+  res.json({
+    status: "OK",
+    uptime: process.uptime(),
+    timestamp: new Date(),
+  });
+});
+
+/* ================================
+   USER REGISTER
+================================ */
+
+app.post("/register", async (req, res) => {
+  try {
+    let { name, email, password, confirmPassword } = req.body;
+
+    if (!name || !email || !password || !confirmPassword) {
+      return res.status(400).json({ message: "All fields required" });
+    }
+
+    name = String(name).trim();
+    email = String(email).trim().toLowerCase();
+
+    if (!name || !email || !password || !confirmPassword) {
+      return res.status(400).json({ message: "All fields required" });
+    }
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({ message: "Passwords mismatch" });
+    }
+
+    const hash = await bcrypt.hash(password, 10);
+
+    db.query(
+      "INSERT INTO users (name,email,password,status) VALUES (?,?,?, 'active')",
+      [name, email, hash],
+      (err) => {
+        if (err) {
+          if (err.code === "ER_DUP_ENTRY") {
+            return res.status(400).json({ message: "Email exists" });
+          }
+          return res.status(500).json({ error: err.message });
+        }
+
+        res.json({ message: "User registered successfully" });
+      }
+    );
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ================================
+   USER LOGIN
+================================ */
+
+app.post("/login", loginLimiter, (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ message: "Email and password required" });
+  }
+
+  db.query(
+    "SELECT * FROM users WHERE email=? LIMIT 1",
+    [String(email).trim().toLowerCase()],
+    async (err, rows) => {
+      if (err) return res.status(500).json({ error: err.message });
+
+      if (!rows || rows.length === 0) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const user = rows[0];
+
+      const match = await bcrypt.compare(password, user.password);
+
+      if (!match) {
+        return res.status(400).json({ message: "Invalid password" });
+      }
+
+      const accessToken = generateAccessToken({
+        id: user.id,
+        role: "user",
+      });
+
+      const refreshToken = generateRefreshToken();
+
+      const expires = new Date(
+        Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000
+      );
+
+      db.query(
+        "INSERT INTO refresh_tokens (user_id,token,expires_at) VALUES (?,?,?)",
+        [user.id, refreshToken, expires],
+        (tokenErr) => {
+          if (tokenErr) {
+            return res.status(500).json({ error: tokenErr.message });
+          }
+
+          res.json({
+            message: "Login successful",
+            accessToken,
+            refreshToken,
+          });
+        }
+      );
+    }
+  );
+});
+
+/* ================================
+   USER PLACE TRADE
+================================ */
+
+app.post("/trade", tradeLimiter, authenticateToken, async (req, res) => {
+  if (req.user.role !== "user") {
+    return res.status(403).json({ message: "Access denied" });
+  }
+
+  const { pair, direction, amount, timer } = req.body;
+  const userId = req.user.id;
+
+  if (!pair || !direction || !amount || !timer) {
+    return res.status(400).json({ message: "Missing trade fields" });
+  }
+
+  if (!["bullish", "bearish"].includes(direction)) {
+    return res.status(400).json({ message: "Invalid direction" });
+  }
+
+  if (Number(amount) <= 0 || Number(timer) <= 0) {
+    return res.status(400).json({ message: "Amount and timer must be positive" });
+  }
+
+  try {
+    const entryPrice = await getBinancePrice(pair);
+
+    db.query("SELECT balance FROM users WHERE id=?", [userId], (err, rows) => {
+      if (err) return res.status(500).json({ error: err.message });
+
+      if (!rows || rows.length === 0) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const balance = Number(rows[0].balance);
+      const tradeAmount = Number(amount);
+      const tradeTimer = Number(timer);
+
+      if (balance < tradeAmount) {
+        return res.status(400).json({ message: "Insufficient balance" });
+      }
+
+      db.query(
+        "UPDATE users SET balance = balance - ? WHERE id=?",
+        [tradeAmount, userId],
+        (updateErr) => {
+          if (updateErr) {
+            return res.status(500).json({ error: updateErr.message });
+          }
+
+          db.query(
+            `INSERT INTO trades
+            (user_id,pair,direction,amount,entry_price,timer,profit_percent,result,status,end_time)
+            VALUES (?,?,?,?,?,?,10,'pending','open',DATE_ADD(NOW(), INTERVAL ? SECOND))`,
+            [userId, pair, direction, tradeAmount, entryPrice, tradeTimer, tradeTimer],
+            (insertErr) => {
+              if (insertErr) {
+                return res.status(500).json({ error: insertErr.message });
+              }
+
+              res.json({
+                message: "Trade placed",
+                entryPrice,
+              });
+            }
+          );
+        }
+      );
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Price unavailable" });
+  }
+});
+
+/* ================================
+   404
+================================ */
+
+app.use((req, res) => {
+  res.status(404).json({ message: "Route not found" });
+});
+
+/* ================================
+   GLOBAL ERROR HANDLER
+================================ */
+
+app.use((err, req, res, next) => {
+  console.error("Server error:", err);
+  res.status(500).json({ message: "Internal server error" });
+});
+
+/* ================================
+   BACKGROUND JOBS
+================================ */
+
+setInterval(processOpenTrades, 5000);
+setInterval(cleanExpiredTokens, 60 * 60 * 1000);
+
+/* ================================
+   SERVER START
+================================ */
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`CryptoPulse running on port ${PORT}`);
+});

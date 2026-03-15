@@ -1,0 +1,37 @@
+===== CRYPTOPULSE DEPLOYMENT NOTES =====
+
+APP NAME (PM2):
+cryptopulse
+
+SERVER PORT:
+5000
+
+DATABASE NAME:
+cryptopulse
+
+JWT_SECRET:
+Stored in .env (Do NOT share)
+
+NODE VERSION:
+Node 20 LTS
+
+ENVIRONMENT:
+production
+
+MAIN API BASE URL (future):
+https://api.yourdomain.com
+
+ADMIN LOGIN:
+Email: your_admin_email_here
+Password: ********
+
+IMPORTANT ROUTES:
+GET /health
+POST /login
+POST /admin/login
+POST /trade
+GET /user/transactions
+GET /admin/all-trades
+POST /withdraw/request
+
+=======================================
