@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import SplashScreen from "./components/SplashScreen";
 import ToastContainer from "./components/ToastNotification";
 import VoucherModal from "./components/VoucherModal";
-import { NotificationProvider, useNotification } from "./hooks/useNotification";
+import { NotificationProvider, useNotification } from "./hooks/useNotification.jsx";
 
 import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
