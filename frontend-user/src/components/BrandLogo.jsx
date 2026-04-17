@@ -35,24 +35,22 @@ export default function BrandLogo({
     <div className={`flex items-center gap-3 ${className}`}>
       <div className="relative flex items-center justify-center">
         <div
-          className={`absolute ${current.glow} rounded-xl bg-cyan-400/20 blur-md animate-pulse`}
+          className={`absolute ${current.glow} rounded-xl bg-lime-400/20 blur-md animate-pulse`}
         />
         <div
-          className={`absolute ${current.ring} rounded-xl border border-cyan-400/25 animate-spin [animation-duration:8s]`}
+          className={`absolute ${current.ring} rounded-xl border border-lime-400/25 animate-spin [animation-duration:8s]`}
         />
         <img
-          src="/cryptopulse-icon.png"
+          src="/cryptopulse-logo.svg"
           alt="CryptoPulse"
-          className={`relative z-10 ${current.wrap} rounded-xl shadow-[0_0_20px_rgba(34,211,238,0.45)] transition duration-300`}
+          className={`relative z-10 ${current.wrap} rounded-xl shadow-[0_0_20px_rgba(163,230,53,0.45)] transition duration-300`}
         />
       </div>
 
       {showText && (
         <div className="leading-none">
-          <div
-            className={`${current.text} font-semibold tracking-wide text-white`}
-          >
-            Crypto<span className="text-cyan-400">Pulse</span>
+          <div className={`${current.text} font-semibold tracking-wide text-white`}>
+            Crypto<span className="text-lime-400">Pulse</span>
           </div>
           <div className="mt-1 text-[10px] uppercase tracking-[0.26em] text-slate-400">
             Exchange
