@@ -64,42 +64,37 @@ function getStoredUser() {
   };
 }
 
+// FIXED: User is fully approved only if ALL conditions are met
 function isUserFullyApproved(user) {
   const emailVerified = Number(user?.email_verified || 0) === 1;
-  const kycApproved =
-    String(user?.kyc_status || "").toLowerCase() === "approved";
-  const statusValue = String(user?.status || "").toLowerCase();
-  const approvedAt = user?.approved_at || null;
-  const accountStage = String(user?.account_stage || "").toLowerCase();
+  const kycApproved = String(user?.kyc_status || "").toLowerCase() === "approved";
+  const statusActive = String(user?.status || "").toLowerCase() === "active";
 
-  if (!emailVerified) return false;
-
-  return (
-    statusValue === "active" ||
-    approvedAt !== null ||
-    kycApproved ||
-    accountStage === "approved"
-  );
+  // User must have ALL three to be fully approved
+  return emailVerified && kycApproved && statusActive;
 }
 
+// FIXED: User is under review if ANY approval condition fails
 function isUserUnderReview(user) {
-  if (!user || !user.email) return false;
+  if (!user || !user.email) return true;
+
+  // If fully approved, definitely NOT under review
+  if (isUserFullyApproved(user)) return false;
 
   const emailVerified = Number(user?.email_verified || 0) === 1;
   const kycStatus = String(user?.kyc_status || "").toLowerCase();
   const statusValue = String(user?.status || "").toLowerCase();
 
+  // Email not verified → under review
   if (!emailVerified) return true;
 
-  if (["pending", "under_review", "review"].includes(statusValue)) {
-    return true;
-  }
+  // KYC not approved → under review
+  if (kycStatus !== "approved") return true;
 
-  if (["pending", "submitted", "under_review"].includes(kycStatus)) {
-    return true;
-  }
+  // Account status not active → under review
+  if (statusValue !== "active") return true;
 
-  return !isUserFullyApproved(user);
+  return false;
 }
 
 async function refreshUserDataFromServer() {
@@ -137,7 +132,8 @@ function AccountVerificationPage() {
     const freshUser = await refreshUserDataFromServer();
     if (freshUser) {
       setUser(freshUser);
-      if (Number(freshUser.email_verified) === 1 && freshUser.status === "active") {
+      // Use the fixed function to check if fully approved
+      if (isUserFullyApproved(freshUser)) {
         showSuccess("Account verified! Redirecting to dashboard...");
         setTimeout(() => {
           window.location.href = "/dashboard";
