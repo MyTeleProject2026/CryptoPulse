@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import ImageCropper from "../components/ImageCropper";
-
 import {
   Mail,
   Shield,
@@ -37,6 +35,7 @@ import {
 import { userApi, getApiErrorMessage } from "../services/api";
 import { getFullImageUrl } from "../utils/image";
 import { useNotification } from "../hooks/useNotification";
+import ImageCropper from "../components/ImageCropper";
 
 function getToken() {
   return localStorage.getItem("userToken") || 
@@ -45,6 +44,7 @@ function getToken() {
          "";
 }
 
+// ✅ formatMoney function - MUST be defined
 function formatMoney(value) {
   const num = Number(value || 0);
   if (!Number.isFinite(num)) return "0.00";
@@ -84,188 +84,6 @@ function getKycClass(status) {
   }
   return "border border-white/10 bg-white/[0.04] text-slate-300";
 }
-
-// ImageCropper Component - FIXED
-function ImageCropper({ imageFile, onCropComplete, onCancel }) {
-  const [zoom, setZoom] = useState(1);
-  const [imageSrc, setImageSrc] = useState(null);
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const [cropPosition, setCropPosition] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
-  
-  const imageRef = useRef(null);
-  const containerRef = useRef(null);
-  const cropSize = 200;
-
-  useEffect(() => {
-    if (imageFile) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setImageSrc(e.target.result);
-      };
-      reader.readAsDataURL(imageFile);
-    }
-  }, [imageFile]);
-
-  useEffect(() => {
-    if (imageRef.current && imageLoaded) {
-      const img = imageRef.current;
-      setImageDimensions({
-        width: img.naturalWidth,
-        height: img.naturalHeight
-      });
-      // Center the crop area
-      setCropPosition({
-        x: Math.max(0, (img.naturalWidth - cropSize) / 2),
-        y: Math.max(0, (img.naturalHeight - cropSize) / 2)
-      });
-    }
-  }, [imageLoaded, cropSize]);
-
-  const handleMouseDown = (e) => {
-    setIsDragging(true);
-    setDragStart({ x: e.clientX, y: e.clientY });
-  };
-
-  const handleMouseMove = (e) => {
-    if (!isDragging || !imageRef.current) return;
-    
-    const dx = e.clientX - dragStart.x;
-    const dy = e.clientY - dragStart.y;
-    
-    const scaleX = imageRef.current.clientWidth / imageDimensions.width;
-    const scaleY = imageRef.current.clientHeight / imageDimensions.height;
-    
-    const newX = Math.min(
-      Math.max(0, cropPosition.x - dx / scaleX),
-      imageDimensions.width - cropSize
-    );
-    const newY = Math.min(
-      Math.max(0, cropPosition.y - dy / scaleY),
-      imageDimensions.height - cropSize
-    );
-    
-    setCropPosition({ x: newX, y: newY });
-    setDragStart({ x: e.clientX, y: e.clientY });
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
-
-  const handleCrop = () => {
-    if (!imageLoaded || !imageRef.current) {
-      alert("Please wait for image to load");
-      return;
-    }
-    
-    const image = imageRef.current;
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    
-    canvas.width = cropSize;
-    canvas.height = cropSize;
-    
-    ctx.drawImage(
-      image,
-      cropPosition.x, cropPosition.y, cropSize, cropSize,
-      0, 0, cropSize, cropSize
-    );
-    
-    canvas.toBlob((blob) => {
-      const file = new File([blob], "cropped-avatar.jpg", { type: "image/jpeg" });
-      onCropComplete(file);
-    }, "image/jpeg", 0.9);
-  };
-
-  const containerStyle = {
-    position: 'relative',
-    width: '100%',
-    height: '300px',
-    overflow: 'hidden',
-    cursor: isDragging ? 'grabbing' : 'grab',
-    backgroundColor: '#1a1a1a',
-    borderRadius: '12px',
-  };
-
-  const imageStyle = {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: `translate(-50%, -50%) scale(${zoom})`,
-    maxWidth: 'none',
-    maxHeight: 'none',
-  };
-
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4">
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#111111] p-6">
-        <h3 className="mb-4 text-xl font-bold text-white">Crop Avatar</h3>
-        
-        <div className="relative">
-          <div 
-            ref={containerRef}
-            style={containerStyle}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-          >
-            {imageSrc && (
-              <img
-                ref={imageRef}
-                src={imageSrc}
-                alt="Crop preview"
-                style={imageStyle}
-                draggable={false}
-                onLoad={() => setImageLoaded(true)}
-              />
-            )}
-          </div>
-          {/* Crop overlay */}
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-              <div className="w-[200px] h-[200px] border-2 border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.7)] rounded-xl" />
-            </div>
-          </div>
-        </div>
-        
-        <div className="mt-4">
-          <label className="mb-2 block text-sm text-slate-400">Zoom</label>
-          <input
-            type="range"
-            min="1"
-            max="3"
-            step="0.01"
-            value={zoom}
-            onChange={(e) => setZoom(parseFloat(e.target.value))}
-            className="w-full"
-          />
-          <p className="mt-2 text-xs text-slate-500">Click and drag the image to position, use zoom to adjust size</p>
-        </div>
-        
-        <div className="mt-6 flex gap-3">
-          <button
-            onClick={onCancel}
-            className="flex-1 rounded-xl border border-white/10 bg-white/5 py-2 text-white transition hover:bg-white/10"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleCrop}
-            disabled={!imageLoaded}
-            className="flex-1 rounded-xl bg-cyan-500 py-2 font-semibold text-black transition hover:bg-cyan-400 disabled:opacity-50"
-          >
-            Apply Crop
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 
 export default function UserCenterPage() {
   const navigate = useNavigate();
@@ -748,8 +566,8 @@ export default function UserCenterPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
+      <div className="flex min-h-[60vh] items-center justify-center bg-black">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-lime-500 border-t-transparent" />
       </div>
     );
   }
@@ -757,7 +575,7 @@ export default function UserCenterPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-5 px-4 py-5 sm:space-y-6 sm:px-6 sm:py-6">
       {/* Header with Balance */}
-      <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-slate-900/80 to-slate-950/80 p-4 shadow-xl sm:p-5">
+      <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-black/80 to-slate-950/80 p-4 shadow-xl sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-xl font-bold text-white sm:text-2xl">User Center</h1>
@@ -803,13 +621,13 @@ export default function UserCenterPage() {
         </div>
       </div>
 
-      {/* Tabs - Mobile friendly */}
-      <div className="flex rounded-xl border border-white/10 bg-slate-900/50 p-1">
+      {/* Tabs */}
+      <div className="flex rounded-xl border border-white/10 bg-black/50 p-1">
         <button
           onClick={() => setActiveTab("profile")}
           className={`flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-2 text-xs font-medium transition sm:gap-2 sm:px-4 sm:py-3 sm:text-sm ${
             activeTab === "profile"
-              ? "bg-cyan-500 text-black"
+              ? "bg-lime-500 text-black"
               : "text-slate-400 hover:text-white"
           }`}
         >
@@ -820,7 +638,7 @@ export default function UserCenterPage() {
           onClick={() => setActiveTab("security")}
           className={`flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-2 text-xs font-medium transition sm:gap-2 sm:px-4 sm:py-3 sm:text-sm ${
             activeTab === "security"
-              ? "bg-cyan-500 text-black"
+              ? "bg-lime-500 text-black"
               : "text-slate-400 hover:text-white"
           }`}
         >
@@ -831,7 +649,7 @@ export default function UserCenterPage() {
           onClick={() => setActiveTab("preferences")}
           className={`flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-2 text-xs font-medium transition sm:gap-2 sm:px-4 sm:py-3 sm:text-sm ${
             activeTab === "preferences"
-              ? "bg-cyan-500 text-black"
+              ? "bg-lime-500 text-black"
               : "text-slate-400 hover:text-white"
           }`}
         >
@@ -843,8 +661,8 @@ export default function UserCenterPage() {
       {/* ==================== PROFILE TAB ==================== */}
       {activeTab === "profile" && (
         <div className="space-y-4 sm:space-y-5">
-          {/* Profile Header Card - Mobile friendly */}
-          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-4 sm:p-5">
+          {/* Profile Header Card */}
+          <div className="rounded-2xl border border-white/10 bg-black/50 p-4 sm:p-5">
             <div className="flex flex-col items-center gap-3 text-center sm:flex-row sm:text-left">
               <div className="h-16 w-16 overflow-hidden rounded-full border border-white/10 bg-white/[0.03] sm:h-20 sm:w-20">
                 {avatarUrl ? (
@@ -877,7 +695,7 @@ export default function UserCenterPage() {
           </div>
 
           {/* Account Information Card */}
-          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-4 sm:p-5">
+          <div className="rounded-2xl border border-white/10 bg-black/50 p-4 sm:p-5">
             <h3 className="mb-3 text-base font-semibold text-white sm:mb-4 sm:text-lg">Account information</h3>
             <div className="space-y-2 text-xs sm:space-y-3 sm:text-sm">
               <div className="flex justify-between border-b border-white/5 pb-2">
@@ -908,7 +726,7 @@ export default function UserCenterPage() {
           {/* Edit Profile Modal */}
           {isEditing && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-              <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-5">
+              <div className="w-full max-w-md rounded-2xl border border-white/10 bg-black p-5">
                 <div className="mb-5 flex items-center justify-between">
                   <h3 className="text-lg font-bold text-white sm:text-xl">Edit profile</h3>
                   <button onClick={closeEditProfile} className="text-slate-400 hover:text-white">
@@ -916,6 +734,7 @@ export default function UserCenterPage() {
                   </button>
                 </div>
                 <div className="space-y-5">
+                  {/* Avatar Section */}
                   <div className="flex flex-col items-center">
                     <div className="relative h-20 w-20 overflow-hidden rounded-full bg-white/5 ring-1 ring-white/10 sm:h-24 sm:w-24">
                       {editAvatarSrc ? (
@@ -957,6 +776,7 @@ export default function UserCenterPage() {
                     <p className="mt-2 text-[10px] text-slate-500 sm:text-xs">Click Gallery or Camera to upload</p>
                   </div>
 
+                  {/* Name Input */}
                   <div>
                     <label className="mb-2 block text-sm text-slate-400">Profile name</label>
                     <input
@@ -964,15 +784,16 @@ export default function UserCenterPage() {
                       value={editForm.name}
                       onChange={handleEditProfileChange}
                       placeholder="Enter your name"
-                      className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-sm text-white outline-none focus:border-cyan-500"
+                      className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-sm text-white outline-none focus:border-lime-500"
                     />
                   </div>
 
+                  {/* Action Buttons */}
                   <div className="flex gap-3">
                     <button 
                       onClick={handleSaveProfile} 
                       disabled={profileSaving} 
-                      className="flex-1 rounded-xl bg-cyan-500 py-2 text-sm font-semibold text-black transition hover:bg-cyan-400 disabled:opacity-50"
+                      className="flex-1 rounded-xl bg-lime-500 py-2 text-sm font-semibold text-black transition hover:bg-lime-400 disabled:opacity-50"
                     >
                       <Save size={14} className="mr-1 inline" />
                       {profileSaving ? "Saving..." : "Save"}
@@ -1007,7 +828,7 @@ export default function UserCenterPage() {
       {activeTab === "security" && (
         <div className="space-y-4 sm:space-y-5">
           {/* Email Verification */}
-          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-4 sm:p-5">
+          <div className="rounded-2xl border border-white/10 bg-black/50 p-4 sm:p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-start gap-3">
                 <div className="rounded-full bg-cyan-500/10 p-1.5 sm:p-2">
@@ -1030,7 +851,7 @@ export default function UserCenterPage() {
           </div>
 
           {/* Transaction Passcode */}
-          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-4 sm:p-5">
+          <div className="rounded-2xl border border-white/10 bg-black/50 p-4 sm:p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-start gap-3">
                 <div className="rounded-full bg-purple-500/10 p-1.5 sm:p-2">
@@ -1054,7 +875,7 @@ export default function UserCenterPage() {
           </div>
 
           {/* 2FA Section */}
-          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-4 sm:p-5">
+          <div className="rounded-2xl border border-white/10 bg-black/50 p-4 sm:p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-start gap-3">
                 <div className="rounded-full bg-emerald-500/10 p-1.5 sm:p-2">
@@ -1078,7 +899,7 @@ export default function UserCenterPage() {
           </div>
 
           {/* Joint Account Section */}
-          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-4 sm:p-5">
+          <div className="rounded-2xl border border-white/10 bg-black/50 p-4 sm:p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex min-w-0 flex-1 items-start gap-3">
                 <div className="shrink-0 rounded-full bg-indigo-500/10 p-1.5 sm:p-2">
@@ -1152,7 +973,7 @@ export default function UserCenterPage() {
       {activeTab === "preferences" && (
         <div className="space-y-3 sm:space-y-4">
           {/* Language */}
-          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-4 sm:p-5">
+          <div className="rounded-2xl border border-white/10 bg-black/50 p-4 sm:p-5">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 <Languages className="h-4 w-4 text-cyan-400 sm:h-5 sm:w-5" />
@@ -1177,7 +998,7 @@ export default function UserCenterPage() {
           </div>
 
           {/* Currency */}
-          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-4 sm:p-5">
+          <div className="rounded-2xl border border-white/10 bg-black/50 p-4 sm:p-5">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 <DollarSign className="h-4 w-4 text-emerald-400 sm:h-5 sm:w-5" />
@@ -1201,7 +1022,7 @@ export default function UserCenterPage() {
           </div>
 
           {/* Appearance */}
-          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-4 sm:p-5">
+          <div className="rounded-2xl border border-white/10 bg-black/50 p-4 sm:p-5">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 {preferences.appearance === "light" ? <Sun className="h-4 w-4 text-yellow-400" /> : preferences.appearance === "dark" ? <Moon className="h-4 w-4 text-slate-400" /> : <Monitor className="h-4 w-4 text-blue-400" />}
@@ -1223,7 +1044,7 @@ export default function UserCenterPage() {
           </div>
 
           {/* Notifications */}
-          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-4 sm:p-5">
+          <div className="rounded-2xl border border-white/10 bg-black/50 p-4 sm:p-5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Bell className="h-4 w-4 text-amber-400 sm:h-5 sm:w-5" />
@@ -1234,7 +1055,7 @@ export default function UserCenterPage() {
               </div>
               <button
                 onClick={() => updatePreference("notifications", !preferences.notifications)}
-                className={`h-5 w-10 rounded-full transition sm:h-6 sm:w-11 ${preferences.notifications ? "bg-cyan-500" : "bg-slate-700"}`}
+                className={`h-5 w-10 rounded-full transition sm:h-6 sm:w-11 ${preferences.notifications ? "bg-lime-500" : "bg-slate-700"}`}
               >
                 <div className={`h-4 w-4 rounded-full bg-white transition ${preferences.notifications ? "ml-5 sm:ml-6" : "ml-0.5"} mt-0.5 sm:h-5 sm:w-5`} />
               </button>
@@ -1242,7 +1063,7 @@ export default function UserCenterPage() {
           </div>
 
           {/* Haptic Feedback */}
-          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-4 sm:p-5">
+          <div className="rounded-2xl border border-white/10 bg-black/50 p-4 sm:p-5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Vibrate className="h-4 w-4 text-purple-400 sm:h-5 sm:w-5" />
@@ -1253,7 +1074,7 @@ export default function UserCenterPage() {
               </div>
               <button
                 onClick={() => updatePreference("hapticFeedback", !preferences.hapticFeedback)}
-                className={`h-5 w-10 rounded-full transition sm:h-6 sm:w-11 ${preferences.hapticFeedback ? "bg-cyan-500" : "bg-slate-700"}`}
+                className={`h-5 w-10 rounded-full transition sm:h-6 sm:w-11 ${preferences.hapticFeedback ? "bg-lime-500" : "bg-slate-700"}`}
               >
                 <div className={`h-4 w-4 rounded-full bg-white transition ${preferences.hapticFeedback ? "ml-5 sm:ml-6" : "ml-0.5"} mt-0.5 sm:h-5 sm:w-5`} />
               </button>
@@ -1261,7 +1082,7 @@ export default function UserCenterPage() {
           </div>
 
           {/* Sound Effects */}
-          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-4 sm:p-5">
+          <div className="rounded-2xl border border-white/10 bg-black/50 p-4 sm:p-5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Volume2 className="h-4 w-4 text-blue-400 sm:h-5 sm:w-5" />
@@ -1272,7 +1093,7 @@ export default function UserCenterPage() {
               </div>
               <button
                 onClick={() => updatePreference("soundEffects", !preferences.soundEffects)}
-                className={`h-5 w-10 rounded-full transition sm:h-6 sm:w-11 ${preferences.soundEffects ? "bg-cyan-500" : "bg-slate-700"}`}
+                className={`h-5 w-10 rounded-full transition sm:h-6 sm:w-11 ${preferences.soundEffects ? "bg-lime-500" : "bg-slate-700"}`}
               >
                 <div className={`h-4 w-4 rounded-full bg-white transition ${preferences.soundEffects ? "ml-5 sm:ml-6" : "ml-0.5"} mt-0.5 sm:h-5 sm:w-5`} />
               </button>
@@ -1280,7 +1101,7 @@ export default function UserCenterPage() {
           </div>
 
           {/* Chart Timezone */}
-          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-4 sm:p-5">
+          <div className="rounded-2xl border border-white/10 bg-black/50 p-4 sm:p-5">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 <Globe className="h-4 w-4 text-indigo-400 sm:h-5 sm:w-5" />
@@ -1311,7 +1132,7 @@ export default function UserCenterPage() {
       {/* Set Passcode Modal */}
       {passcodeModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-5 sm:p-6">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-black p-5 sm:p-6">
             <h2 className="mb-4 text-lg font-bold text-white sm:text-xl">{securityStatus.hasPasscode ? "Change Passcode" : "Set Passcode"}</h2>
             <div className="space-y-4">
               <div>
@@ -1358,7 +1179,7 @@ export default function UserCenterPage() {
       {/* Email Verification Modal */}
       {verifyModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-5 sm:p-6">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-black p-5 sm:p-6">
             <h2 className="mb-2 text-lg font-bold text-white sm:text-xl">Verify Email</h2>
             <p className="mb-4 text-xs text-slate-400 sm:text-sm">Verification code will be sent to {profile.email}</p>
             <button onClick={handleSendVerificationCode} disabled={sendingCode || countdown > 0} className="w-full rounded-xl bg-cyan-500 py-2 text-sm font-semibold text-black disabled:opacity-50 sm:py-3">
@@ -1366,7 +1187,7 @@ export default function UserCenterPage() {
             </button>
             <div className="mt-4">
               <label className="mb-2 block text-sm text-slate-400">Enter 6-digit code</label>
-              <input type="text" value={verificationCode} onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="000000" className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-center text-xl tracking-widest text-white outline-none focus:border-cyan-500 sm:text-2xl" maxLength={6} />
+              <input type="text" value={verificationCode} onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="000000" className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-center text-xl tracking-widest text-white outline-none focus:border-cyan-500" maxLength={6} />
             </div>
             <div className="mt-6 flex gap-3">
               <button onClick={() => { setVerifyModalOpen(false); setVerificationCode(""); setVerificationError(""); setVerificationSuccess(""); }} className="flex-1 rounded-xl border border-white/10 bg-white/5 py-2 text-white">
@@ -1383,7 +1204,7 @@ export default function UserCenterPage() {
       {/* Verify Passcode Modal */}
       {verifyPasscodeModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-5 sm:p-6">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-black p-5 sm:p-6">
             <h2 className="mb-4 text-lg font-bold text-white sm:text-xl">Verify Passcode</h2>
             <p className="mb-4 text-xs text-slate-400 sm:text-sm">Please enter your passcode to continue</p>
             <input type="password" value={verifyPasscode} onChange={(e) => setVerifyPasscode(e.target.value)} placeholder="Enter your passcode" className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-sm text-white outline-none focus:border-purple-500" />
@@ -1403,7 +1224,7 @@ export default function UserCenterPage() {
       {/* Joint Account Request Modal */}
       {jointModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-5 sm:p-6">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-black p-5 sm:p-6">
             <h2 className="mb-3 text-lg font-bold text-white sm:mb-4 sm:text-xl">Request Joint Account</h2>
             <p className="mb-4 text-xs text-slate-400 sm:text-sm">
               Enter the email of the user you want to create a joint account with.
