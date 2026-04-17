@@ -844,37 +844,31 @@ export default function AssetsPage() {
         </div>
 
         <div className="mt-6">
-          <div className="text-sm text-slate-400">
-            {combinedBalance !== null ? "Combined Total Value" : "Est total value"}
-          </div>
-          <div className="mt-2 flex items-end gap-2">
-            <div className="text-4xl font-bold tracking-tight text-white sm:text-5xl">
-              {formatMoney(displayBalance)}
-            </div>
-            <div className="mb-1 text-lg font-semibold text-white sm:text-xl">USD</div>
-          </div>
-
-          {/* Show breakdown if joint account */}
-          {jointBalanceData?.hasJointAccount && (
-            <div className="mt-2 text-xs text-slate-500">
-              Your balance: {formatMoney(jointBalanceData.userBalance)} USDT + 
-              {jointPartner?.name}'s balance: {formatMoney(jointBalanceData.partnerBalance)} USDT
-            </div>
-          )}
-
-          <button
-            type="button"
-            onClick={() => navigate("/transactions")}
-            className="mt-3 inline-flex items-center gap-1.5 text-sm text-slate-400 transition hover:text-white sm:text-base"
-          >
-            <span>
-              Today&apos;s PnL {totalSpotPnl >= 0 ? "+" : "-"}$
-              {formatMoney(Math.abs(totalSpotPnl))} ({totalSpotPnl >= 0 ? "+" : ""}
-              {Number(pnlPercent).toFixed(2)}%)
-            </span>
-            <ChevronRight size={16} />
-          </button>
+        <div className="text-sm text-slate-400">
+          {combinedBalance !== null ? "Combined Total Value" : "Est total value"}
         </div>
+        <div className="mt-2 flex items-end gap-2">
+          <div className="text-4xl font-bold tracking-tight text-white sm:text-5xl">
+            {formatMoney(displayBalance)}
+          </div>
+          <div className="mb-1 text-lg font-semibold text-white sm:text-xl">USD</div>
+        </div>
+
+        {/* Balance breakdown text removed */}
+
+        <button
+          type="button"
+          onClick={() => navigate("/transactions")}
+          className="mt-3 inline-flex items-center gap-1.5 text-sm text-slate-400 transition hover:text-white sm:text-base"
+        >
+          <span>
+            Today&apos;s PnL {totalSpotPnl >= 0 ? "+" : "-"}$
+            {formatMoney(Math.abs(totalSpotPnl))} ({totalSpotPnl >= 0 ? "+" : ""}
+            {Number(pnlPercent).toFixed(2)}%)
+          </span>
+          <ChevronRight size={16} />
+        </button>
+      </div>
 
         <div className="mt-6 grid grid-cols-4 gap-2 sm:gap-3">
           <CircleAction
