@@ -87,6 +87,10 @@ const PAGE_META = {
     title: "Joint Account Requests",
     subtitle: "Review and approve or reject joint account requests.",
   },
+  "/admin/joint-accounts": {
+  title: "Joint Accounts",
+  subtitle: "View and manage all active joint accounts.",
+},
 };
 
 export default function AdminLayout() {
