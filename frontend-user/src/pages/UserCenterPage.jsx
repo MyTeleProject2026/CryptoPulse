@@ -332,6 +332,7 @@ export default function UserCenterPage() {
   // Joint Account states
   const [jointModalOpen, setJointModalOpen] = useState(false);
   const [jointAccountStatus, setJointAccountStatus] = useState(null);
+  const [jointPartner, setJointPartner] = useState(null);
   const [jointForm, setJointForm] = useState({
     partnerEmail: "",
     partnerKycNumber: "",
@@ -416,7 +417,32 @@ export default function UserCenterPage() {
     try {
       const res = await userApi.getJointAccountStatus(token);
       if (res?.data?.success) {
-        setJointAccountStatus(res.data.data);
+        const data = res.data.data;
+        setJointAccountStatus(data);
+        
+        // If has active joint account, fetch partner info
+        if (data.hasJointAccount && data.jointAccount) {
+          const currentUid = profile.uid;
+          const partnerUid = data.jointAccount.user1_uid === currentUid 
+            ? data.jointAccount.user2_uid 
+            : data.jointAccount.user1_uid;
+          
+          if (partnerUid) {
+            try {
+              const partnerRes = await fetch(`${import.meta.env.VITE_API_BASE_URL || "https://cryptopulse-4rhe.onrender.com"}/api/user/by-uid/${partnerUid}`, {
+                headers: { Authorization: `Bearer ${token}` }
+              });
+              const partnerData = await partnerRes.json();
+              if (partnerData.success) {
+                setJointPartner(partnerData.data);
+              }
+            } catch (err) {
+              console.error("Failed to load partner info:", err);
+            }
+          }
+        } else {
+          setJointPartner(null);
+        }
       }
     } catch (err) {
       console.error("Failed to load joint account status:", err);
@@ -429,6 +455,7 @@ export default function UserCenterPage() {
       localStorage.removeItem("user");
       localStorage.removeItem("userData");
       await loadAllData();
+      await loadJointAccountStatus();
       showSuccess("User data refreshed successfully!");
     } catch (err) {
       showError(getApiErrorMessage(err));
@@ -1009,11 +1036,19 @@ export default function UserCenterPage() {
                       <p className="text-xs text-slate-500 mt-1">
                         Account ID: {jointAccountStatus.jointAccount?.account_id}
                       </p>
+                      {jointPartner && (
+                        <p className="text-xs text-indigo-300 mt-1">
+                          Connected with: {jointPartner.name || jointPartner.email}
+                        </p>
+                      )}
                     </div>
                   )}
                   {jointAccountStatus?.pendingRequest && (
                     <div className="mt-2">
                       <StatusBadge verified={false} label="Request Pending Approval" />
+                      <p className="text-xs text-amber-300 mt-1">
+                        Awaiting admin approval for your joint account request
+                      </p>
                     </div>
                   )}
                 </div>

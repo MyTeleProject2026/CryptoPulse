@@ -15,6 +15,7 @@ import {
   Check,
   Camera,
   Send,
+  Users,
 } from "lucide-react";
 
 import {
@@ -190,14 +191,14 @@ function CircleAction({ icon: Icon, label, onClick }) {
   );
 }
 
-function PortfolioCard({ title, value, subtext }) {
+function PortfolioCard({ title, value, subtext, icon: Icon, tone = "text-white" }) {
   return (
     <div className="rounded-[22px] border border-white/5 bg-[#141414] p-4 shadow-[0_12px_30px_rgba(0,0,0,0.22)]">
-      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-slate-400">
-        <div className="h-2.5 w-2.5 rounded-full bg-white/40" />
+      <div className="flex items-center justify-between">
+        <div className="text-xs text-slate-400 sm:text-sm">{title}</div>
+        {Icon && <Icon size={18} className="text-slate-500" />}
       </div>
-      <div className="mt-3 text-xs text-slate-400 sm:text-sm">{title}</div>
-      <div className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-[28px]">
+      <div className={`mt-2 text-2xl font-semibold tracking-tight text-white sm:text-[28px] ${tone}`}>
         {value}
       </div>
       {subtext ? (
@@ -393,7 +394,6 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
       if (data.success) {
         showSuccess(`Successfully sent ${amount} USDT to ${scannedUser.name || scannedUser.email}`);
         
-        // Show voucher for transfer
         const { showVoucher } = useNotification();
         if (showVoucher) {
           showVoucher({
@@ -620,6 +620,10 @@ export default function AssetsPage() {
   const [holdings, setHoldings] = useState([]);
   const [openTrades, setOpenTrades] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  
+  // Joint Account State
+  const [jointAccount, setJointAccount] = useState(null);
+  const [jointPartner, setJointPartner] = useState(null);
 
   async function loadData(silent = false) {
     try {
@@ -635,6 +639,7 @@ export default function AssetsPage() {
         typeof userApi?.getNotifications === "function"
           ? userApi.getNotifications(token)
           : Promise.resolve({ data: { data: [] } }),
+        userApi.getJointAccountStatus(token),
       ];
 
       if (typeof userApi?.getAssetHoldings === "function") {
@@ -647,7 +652,7 @@ export default function AssetsPage() {
         tasks.push(Promise.resolve({ data: { data: [] } }));
       }
 
-      const [walletRes, marketRes, openTradeRes, notificationRes, holdingsRes] =
+      const [walletRes, marketRes, openTradeRes, notificationRes, jointRes, holdingsRes] =
         await Promise.allSettled(tasks);
 
       if (walletRes.status === "fulfilled") {
@@ -680,6 +685,37 @@ export default function AssetsPage() {
             ? notificationRes.value.data.data
             : []
         );
+      }
+
+      // Load Joint Account Info
+      if (jointRes.status === "fulfilled" && jointRes.value?.data?.success) {
+        const jointData = jointRes.value.data.data;
+        if (jointData.hasJointAccount && jointData.jointAccount) {
+          setJointAccount(jointData.jointAccount);
+          
+          // Get partner info
+          const currentUid = wallet.user?.uid;
+          const partnerUid = jointData.jointAccount.user1_uid === currentUid 
+            ? jointData.jointAccount.user2_uid 
+            : jointData.jointAccount.user1_uid;
+          
+          if (partnerUid) {
+            try {
+              const partnerRes = await fetch(`${import.meta.env.VITE_API_BASE_URL || "https://cryptopulse-4rhe.onrender.com"}/api/user/by-uid/${partnerUid}`, {
+                headers: { Authorization: `Bearer ${token}` }
+              });
+              const partnerData = await partnerRes.json();
+              if (partnerData.success) {
+                setJointPartner(partnerData.data);
+              }
+            } catch (err) {
+              console.error("Failed to load partner info:", err);
+            }
+          }
+        } else {
+          setJointAccount(null);
+          setJointPartner(null);
+        }
       }
 
       if (holdingsRes.status === "fulfilled") {
@@ -874,6 +910,17 @@ export default function AssetsPage() {
             subtext={unreadNotifications === 1 ? "Unread alert" : "Unread alerts"}
           />
         </div>
+
+        {/* Joint Account Card - Shows if user has active joint account */}
+        {jointAccount && jointPartner && (
+          <PortfolioCard
+            value={`Connected to: ${jointPartner.name || jointPartner.email}`}
+            title="Joint Account"
+            subtext={`Account ID: ${jointAccount.account_id} • Share assets together`}
+            icon={Users}
+            tone="text-indigo-300"
+          />
+        )}
       </section>
 
       <section className="space-y-3">
