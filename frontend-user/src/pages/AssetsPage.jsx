@@ -693,11 +693,17 @@ export default function AssetsPage() {
         if (jointData.hasJointAccount && jointData.jointAccount) {
           setJointAccount(jointData.jointAccount);
           
-          // Get partner info
+          // Get current user's UID from wallet
           const currentUid = wallet.user?.uid;
-          const partnerUid = jointData.jointAccount.user1_uid === currentUid 
-            ? jointData.jointAccount.user2_uid 
-            : jointData.jointAccount.user1_uid;
+          const jointAccount = jointData.jointAccount;
+          
+          // Determine partner UID (the one that is NOT the current user)
+          let partnerUid = null;
+          if (jointAccount.user1_uid === currentUid) {
+            partnerUid = jointAccount.user2_uid;
+          } else if (jointAccount.user2_uid === currentUid) {
+            partnerUid = jointAccount.user1_uid;
+          }
           
           if (partnerUid) {
             try {
@@ -717,7 +723,6 @@ export default function AssetsPage() {
           setJointPartner(null);
         }
       }
-
       if (holdingsRes.status === "fulfilled") {
         const rows =
           holdingsRes.value?.data?.data?.assets ||

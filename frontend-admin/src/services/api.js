@@ -98,6 +98,13 @@ export const adminApi = {
   rejectJointAccountRequest: (id, payload, token) =>
     api.post(`/api/admin/joint-account-requests/${id}/reject`, payload || {}, authHeaders(token)),
 
+  // Joint Accounts Management
+  getJointAccounts: (token) =>
+    api.get("/api/admin/joint-accounts", authHeaders(token)),
+
+  disconnectJointAccount: (id, token) =>
+    api.post(`/api/admin/joint-accounts/${id}/disconnect`, {}, authHeaders(token)),
+
   /* ---------------- USER NOTIFICATIONS ---------------- */
   sendNotification: (payload, token) =>
     api.post("/api/admin/notifications/send", payload, authHeaders(token)),

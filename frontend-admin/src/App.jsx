@@ -20,7 +20,7 @@ import AdminLegalDocumentsPage from "./pages/admin/AdminLegalDocumentsPage";
 import AdminNewsPage from "./pages/admin/AdminNewsPage";
 import AdminTradingFundsControlPage from "./pages/admin/AdminTradingFundsControlPage";
 import AdminJointAccountRequests from "./pages/admin/AdminJointAccountRequests";
-
+import AdminJointAccountsPage from "./pages/admin/AdminJointAccountsPage";
 import AdminLayout from "./layouts/AdminLayout";
 
 function PrivateRoute({ children }) {
@@ -68,6 +68,7 @@ export default function App() {
           element={<AdminTradingFundsControlPage />}
         />
         <Route path="joint-account-requests" element={<AdminJointAccountRequests />} />
+        <Route path="joint-accounts" element={<AdminJointAccountsPage />} />
 
         <Route path="audit-logs" element={<AdminAuditLogsPage />} />
         <Route path="support" element={<AdminSupportPage />} />

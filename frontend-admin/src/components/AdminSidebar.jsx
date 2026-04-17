@@ -35,6 +35,7 @@ const navItems = [
       { label: "All Users", to: "/admin/users", icon: Users },
       { label: "KYC Verification", to: "/admin/kyc", icon: ShieldCheck },
       { label: "Joint Account Requests", to: "/admin/joint-account-requests", icon: Handshake },
+      { label: "Joint Accounts", to: "/admin/joint-accounts", icon: Users },
       { label: "Deposits", to: "/admin/deposits", icon: ArrowDownToLine },
       { label: "Deposit Networks", to: "/admin/deposit-networks", icon: Network },
       { label: "Withdrawals", to: "/admin/withdrawals", icon: ArrowUpToLine },

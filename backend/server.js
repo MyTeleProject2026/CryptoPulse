@@ -7672,6 +7672,113 @@ app.post("/api/admin/joint-account-requests/:id/reject", authenticateAdmin, asyn
   }
 });
 
+
+/* =========================
+   ADMIN DISCONNECT JOINT ACCOUNT
+========================= */
+
+app.post("/api/admin/joint-accounts/:id/disconnect", authenticateAdmin, async (req, res, next) => {
+  const connection = await pool.getConnection();
+  
+  try {
+    const jointAccountId = Number(req.params.id);
+    
+    if (!Number.isFinite(jointAccountId) || jointAccountId <= 0) {
+      throw createError(400, "Invalid joint account id");
+    }
+    
+    await connection.beginTransaction();
+    
+    // Get joint account details
+    const [jointRows] = await connection.execute(
+      `SELECT * FROM joint_accounts WHERE id = ? AND status = 'active'`,
+      [jointAccountId]
+    );
+    
+    if (!jointRows.length) {
+      throw createError(404, "Joint account not found or already disconnected");
+    }
+    
+    const jointAccount = jointRows[0];
+    
+    // Update status to 'inactive' (disconnected)
+    await connection.execute(
+      `UPDATE joint_accounts SET status = 'inactive', updated_at = NOW() WHERE id = ?`,
+      [jointAccountId]
+    );
+    
+    // Notify both users
+    const [user1Rows] = await connection.execute(
+      `SELECT id FROM users WHERE uid = ? LIMIT 1`,
+      [jointAccount.user1_uid]
+    );
+    
+    const [user2Rows] = await connection.execute(
+      `SELECT id FROM users WHERE uid = ? LIMIT 1`,
+      [jointAccount.user2_uid]
+    );
+    
+    if (user1Rows.length) {
+      await createUserNotification(connection, {
+        userId: user1Rows[0].id,
+        title: "Joint Account Disconnected",
+        message: `Your joint account with ${jointAccount.user2_uid} has been disconnected by admin.`,
+        type: "security",
+      });
+    }
+    
+    if (user2Rows.length) {
+      await createUserNotification(connection, {
+        userId: user2Rows[0].id,
+        title: "Joint Account Disconnected",
+        message: `Your joint account with ${jointAccount.user1_uid} has been disconnected by admin.`,
+        type: "security",
+      });
+    }
+    
+    await createAuditLog(connection, {
+      adminId: req.admin.id,
+      action: "disconnect_joint_account",
+      referenceId: jointAccountId,
+      note: `Disconnected joint account #${jointAccountId} between ${jointAccount.user1_uid} and ${jointAccount.user2_uid}`,
+    });
+    
+    await connection.commit();
+    
+    res.json({
+      success: true,
+      message: "Joint account disconnected successfully",
+    });
+  } catch (error) {
+    await connection.rollback();
+    next(error);
+  } finally {
+    connection.release();
+  }
+});
+
+// Get all joint accounts (for admin)
+app.get("/api/admin/joint-accounts", authenticateAdmin, async (req, res, next) => {
+  try {
+    const [rows] = await pool.execute(
+      `SELECT ja.*, 
+        u1.name as user1_name, u1.email as user1_email,
+        u2.name as user2_name, u2.email as user2_email
+       FROM joint_accounts ja
+       LEFT JOIN users u1 ON u1.uid = ja.user1_uid
+       LEFT JOIN users u2 ON u2.uid = ja.user2_uid
+       ORDER BY ja.created_at DESC`
+    );
+    
+    res.json({
+      success: true,
+      data: rows,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 /* =========================
    404 API HANDLER
 ========================= */

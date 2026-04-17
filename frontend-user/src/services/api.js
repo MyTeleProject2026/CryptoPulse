@@ -105,12 +105,12 @@ export const userApi = {
   getPortfolioAssets: (token) =>
     api.get("/api/user/portfolio-assets", authHeaders(token)),
 
+  // Add these to your adminApi object
   getNotifications: (token) =>
-    api.get("/api/user/notifications", authHeaders(token)),
+    api.get("/api/admin/notifications", authHeaders(token)),
 
   markNotificationRead: (id, token) =>
-    api.post(`/api/user/notifications/${id}/read`, {}, authHeaders(token)),
-
+    api.put(`/api/admin/notifications/${id}/read`, {}, authHeaders(token)),
   deleteNotification: (id, token) =>
     api.delete(`/api/user/notifications/${id}`, authHeaders(token)),
 

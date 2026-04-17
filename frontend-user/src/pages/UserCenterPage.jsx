@@ -414,40 +414,46 @@ export default function UserCenterPage() {
   }
 
   async function loadJointAccountStatus() {
-    try {
-      const res = await userApi.getJointAccountStatus(token);
-      if (res?.data?.success) {
-        const data = res.data.data;
-        setJointAccountStatus(data);
+  try {
+    const res = await userApi.getJointAccountStatus(token);
+    if (res?.data?.success) {
+      const data = res.data.data;
+      setJointAccountStatus(data);
+      
+      // If has active joint account, fetch partner info
+      if (data.hasJointAccount && data.jointAccount) {
+        const currentUid = profile.uid;
+        const jointAccount = data.jointAccount;
         
-        // If has active joint account, fetch partner info
-        if (data.hasJointAccount && data.jointAccount) {
-          const currentUid = profile.uid;
-          const partnerUid = data.jointAccount.user1_uid === currentUid 
-            ? data.jointAccount.user2_uid 
-            : data.jointAccount.user1_uid;
-          
-          if (partnerUid) {
-            try {
-              const partnerRes = await fetch(`${import.meta.env.VITE_API_BASE_URL || "https://cryptopulse-4rhe.onrender.com"}/api/user/by-uid/${partnerUid}`, {
-                headers: { Authorization: `Bearer ${token}` }
-              });
-              const partnerData = await partnerRes.json();
-              if (partnerData.success) {
-                setJointPartner(partnerData.data);
-              }
-            } catch (err) {
-              console.error("Failed to load partner info:", err);
-            }
-          }
-        } else {
-          setJointPartner(null);
+        // Determine which UID is the partner (not the current user)
+        let partnerUid = null;
+        if (jointAccount.user1_uid === currentUid) {
+          partnerUid = jointAccount.user2_uid;
+        } else if (jointAccount.user2_uid === currentUid) {
+          partnerUid = jointAccount.user1_uid;
         }
+        
+        if (partnerUid) {
+          try {
+            const partnerRes = await fetch(`${import.meta.env.VITE_API_BASE_URL || "https://cryptopulse-4rhe.onrender.com"}/api/user/by-uid/${partnerUid}`, {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            const partnerData = await partnerRes.json();
+            if (partnerData.success) {
+              setJointPartner(partnerData.data);
+            }
+          } catch (err) {
+            console.error("Failed to load partner info:", err);
+          }
+        }
+      } else {
+        setJointPartner(null);
       }
-    } catch (err) {
-      console.error("Failed to load joint account status:", err);
     }
+  } catch (err) {
+    console.error("Failed to load joint account status:", err);
   }
+}
 
   async function forceRefreshUserData() {
     try {
