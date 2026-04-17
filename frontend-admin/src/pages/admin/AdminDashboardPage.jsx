@@ -12,6 +12,7 @@ import {
   XCircle,
   Clock3,
   Eye,
+  CandlestickChart,  // ← ADDED
 } from "lucide-react";
 import { adminApi, getApiErrorMessage } from "../../services/api";
 
