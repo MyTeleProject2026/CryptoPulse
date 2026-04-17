@@ -1018,26 +1018,26 @@ export default function UserCenterPage() {
             </div>
           </div>
 
-          {/* Joint Account Section */}
+          {/* Joint Account Section - FIXED */}
           <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-5">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-start gap-3">
-                <div className="rounded-full bg-indigo-500/10 p-2">
+              <div className="flex min-w-0 flex-1 items-start gap-3">
+                <div className="shrink-0 rounded-full bg-indigo-500/10 p-2">
                   <Users className="h-5 w-5 text-indigo-400" />
                 </div>
-                <div>
+                <div className="min-w-0 flex-1">
                   <h3 className="font-semibold text-white">Joint Account</h3>
-                  <p className="text-sm text-slate-400">
+                  <p className="text-sm text-slate-400 break-words">
                     Connect with another user to share balances and manage assets together
                   </p>
                   {jointAccountStatus?.hasJointAccount && (
                     <div className="mt-2">
                       <StatusBadge verified={true} label="Active Joint Account" />
-                      <p className="text-xs text-slate-500 mt-1">
+                      <p className="mt-1 text-xs text-slate-500 break-all">
                         Account ID: {jointAccountStatus.jointAccount?.account_id}
                       </p>
                       {jointPartner && (
-                        <p className="text-xs text-indigo-300 mt-1">
+                        <p className="mt-1 text-xs text-indigo-300 break-words">
                           Connected with: {jointPartner.name || jointPartner.email}
                         </p>
                       )}
@@ -1046,7 +1046,7 @@ export default function UserCenterPage() {
                   {jointAccountStatus?.pendingRequest && (
                     <div className="mt-2">
                       <StatusBadge verified={false} label="Request Pending Approval" />
-                      <p className="text-xs text-amber-300 mt-1">
+                      <p className="mt-1 text-xs text-amber-300">
                         Awaiting admin approval for your joint account request
                       </p>
                     </div>
@@ -1054,22 +1054,24 @@ export default function UserCenterPage() {
                 </div>
               </div>
               
-              {!jointAccountStatus?.hasJointAccount && !jointAccountStatus?.pendingRequest ? (
-                <button
-                  onClick={() => setJointModalOpen(true)}
-                  className="rounded-xl bg-indigo-500 px-4 py-2 text-sm font-semibold text-black hover:bg-indigo-400 transition"
-                >
-                  Request Joint Account
-                </button>
-              ) : jointAccountStatus?.pendingRequest ? (
-                <span className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-2 text-sm text-amber-300">
-                  Awaiting Admin Approval
-                </span>
-              ) : (
-                <span className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-300">
-                  Joint Account Active
-                </span>
-              )}
+              <div className="shrink-0">
+                {!jointAccountStatus?.hasJointAccount && !jointAccountStatus?.pendingRequest ? (
+                  <button
+                    onClick={() => setJointModalOpen(true)}
+                    className="whitespace-nowrap rounded-xl bg-indigo-500 px-4 py-2 text-sm font-semibold text-black hover:bg-indigo-400 transition"
+                  >
+                    Request Joint Account
+                  </button>
+                ) : jointAccountStatus?.pendingRequest ? (
+                  <span className="inline-block whitespace-nowrap rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-2 text-sm text-amber-300">
+                    Awaiting Admin Approval
+                  </span>
+                ) : (
+                  <span className="inline-block whitespace-nowrap rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-300">
+                    Joint Account Active
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>
