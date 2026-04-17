@@ -223,91 +223,99 @@ export default function UserLayout() {
   }
 
   return (
-    <div className="flex min-h-screen bg-black text-white">
-      <aside className="hidden md:block md:shrink-0">
-        <div className="h-screen">
-          <UserSidebar />
-        </div>
-      </aside>
-
-      {sidebarOpen ? (
-        <div className="fixed inset-0 z-50 flex md:hidden">
-          <button
-            type="button"
-            className="flex-1 bg-black/60 backdrop-blur-sm"
-            onClick={() => setSidebarOpen(false)}
-          />
-          <div className="h-full w-[85%] max-w-sm border-l border-white/10 bg-black shadow-2xl">
-            <UserSidebar
-              onNavigate={() => setSidebarOpen(false)}
-              onClose={() => setSidebarOpen(false)}
-              showClose={true}
-            />
+    <div className="min-h-screen bg-black text-white relative">
+      {/* Background gradient overlay for better mobile experience */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(163,230,53,0.06),transparent_18%)]" />
+      </div>
+      
+      {/* Main content */}
+      <div className="relative z-10 flex min-h-screen">
+        <aside className="hidden md:block md:shrink-0">
+          <div className="h-screen">
+            <UserSidebar />
           </div>
-        </div>
-      ) : null}
+        </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 border-b border-white/10 bg-[#081223]/95 backdrop-blur-xl">
-          <div className="flex items-center justify-between px-4 py-3">
-            <div className="flex min-w-0 items-center gap-3">
-              {showBackButton ? (
-                <button
-                  type="button"
-                  onClick={handleBack}
-                  className="flex h-11 w-11 items-center justify-center rounded-full bg-white/5 text-white"
-                >
-                  <ArrowLeft size={20} />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setSidebarOpen(true)}
-                  className="flex h-11 w-11 items-center justify-center rounded-full bg-white/5 text-white md:hidden"
-                >
-                  <Menu size={20} />
-                </button>
-              )}
+        {sidebarOpen ? (
+          <div className="fixed inset-0 z-50 flex md:hidden">
+            <button
+              type="button"
+              className="flex-1 bg-black/60 backdrop-blur-sm"
+              onClick={() => setSidebarOpen(false)}
+            />
+            <div className="h-full w-[85%] max-w-sm border-l border-white/10 bg-black shadow-2xl">
+              <UserSidebar
+                onNavigate={() => setSidebarOpen(false)}
+                onClose={() => setSidebarOpen(false)}
+                showClose={true}
+              />
+            </div>
+          </div>
+        ) : null}
 
-              <div className="min-w-0">
-                <div className="truncate font-semibold text-white">
-                  {pageMeta.title}
-                </div>
-                <div className="truncate text-xs text-gray-400">
-                  {pageMeta.subtitle}
+        <div className="flex min-w-0 flex-1 flex-col">
+          <header className="sticky top-0 z-30 border-b border-white/10 bg-black/95 backdrop-blur-xl">
+            <div className="flex items-center justify-between px-4 py-3">
+              <div className="flex min-w-0 items-center gap-3">
+                {showBackButton ? (
+                  <button
+                    type="button"
+                    onClick={handleBack}
+                    className="flex h-11 w-11 items-center justify-center rounded-full bg-white/5 text-white"
+                  >
+                    <ArrowLeft size={20} />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setSidebarOpen(true)}
+                    className="flex h-11 w-11 items-center justify-center rounded-full bg-white/5 text-white md:hidden"
+                  >
+                    <Menu size={20} />
+                  </button>
+                )}
+
+                <div className="min-w-0">
+                  <div className="truncate font-semibold text-white">
+                    {pageMeta.title}
+                  </div>
+                  <div className="truncate text-xs text-gray-400">
+                    {pageMeta.subtitle}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={openWallet}
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-white/5 text-white"
-              >
-                <Wallet size={18} />
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={openWallet}
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-white/5 text-white"
+                >
+                  <Wallet size={18} />
+                </button>
 
-              <button
-                type="button"
-                onClick={openNotifications}
-                className="relative flex h-10 w-10 items-center justify-center rounded-full bg-white/5 text-white"
-              >
-                <Bell size={18} />
-                {hasUnread ? (
-                  <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500" />
-                ) : null}
-              </button>
+                <button
+                  type="button"
+                  onClick={openNotifications}
+                  className="relative flex h-10 w-10 items-center justify-center rounded-full bg-white/5 text-white"
+                >
+                  <Bell size={18} />
+                  {hasUnread ? (
+                    <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500" />
+                  ) : null}
+                </button>
+              </div>
             </div>
+          </header>
+
+          <main className="flex-1 overflow-y-auto pb-24 md:pb-6">
+            <Outlet />
+          </main>
+
+          <div className="md:hidden">
+            <MobileBottomNav />
           </div>
-        </header>
-
-        <main className="flex-1 overflow-y-auto pb-24 md:pb-6">
-          <Outlet />
-        </main>
-
-        <div className="md:hidden">
-          <MobileBottomNav />
         </div>
       </div>
     </div>
