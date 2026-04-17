@@ -464,28 +464,41 @@ function addDays(date, days) {
 async function getBinancePrice(symbol) {
   const upperSymbol = String(symbol || "").toUpperCase().trim();
 
-  try {
-    const response = await axios.get(BINANCE_PRICE_API, {
-      params: { symbol: upperSymbol },
-      timeout: 10000,
-    });
+  // Try multiple endpoints
+  const endpoints = [
+    "https://api.binance.us/api/v3/ticker/price",   // US endpoint
+    "https://data.binance.com/api/v3/ticker/price", // CDN endpoint
+    BINANCE_PRICE_API                                // Original endpoint
+  ];
 
-    return toNumber(response.data?.price || 0);
-  } catch (error) {
-    console.error(`Binance price fetch failed for ${upperSymbol}:`, error.message);
-
+  for (const endpoint of endpoints) {
     try {
-      const bybitPrice = await getBybitPrice(upperSymbol);
-      if (bybitPrice > 0) return bybitPrice;
-    } catch (_error) {}
-
-    try {
-      const kucoinPrice = await getKucoinPrice(upperSymbol);
-      if (kucoinPrice > 0) return kucoinPrice;
-    } catch (_error) {}
-
-    return 0;
+      const response = await axios.get(endpoint, {
+        params: { symbol: upperSymbol },
+        timeout: 10000,
+      });
+      const price = response.data?.price;
+      if (price && Number(price) > 0) {
+        return toNumber(price);
+      }
+    } catch (error) {
+      continue; // Try next endpoint
+    }
   }
+
+  // Fallback to Bybit
+  try {
+    const bybitPrice = await getBybitPrice(upperSymbol);
+    if (bybitPrice > 0) return bybitPrice;
+  } catch (_error) {}
+
+  // Fallback to KuCoin
+  try {
+    const kucoinPrice = await getKucoinPrice(upperSymbol);
+    if (kucoinPrice > 0) return kucoinPrice;
+  } catch (_error) {}
+
+  return 0;
 }
 
 async function getBybitPrice(symbol) {
@@ -523,9 +536,29 @@ async function getBinanceHomeMarkets(symbols) {
         .filter(Boolean)
     : [];
 
-  try {
-    const response = await axios.get(BINANCE_24H_API, { timeout: 10000 });
-    const rows = Array.isArray(response.data) ? response.data : [];
+  // Try multiple Binance endpoints (US-friendly first)
+  const binanceEndpoints = [
+    "https://api.binance.us/api/v3/ticker/24hr",   // US endpoint (works in US)
+    "https://data.binance.com/api/v3/ticker/24hr", // CDN endpoint
+    BINANCE_24H_API                                 // Original endpoint
+  ];
+  
+  let response = null;
+  for (const endpoint of binanceEndpoints) {
+    try {
+      response = await axios.get(endpoint, { timeout: 10000 });
+      if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+        console.log(`✅ Binance market data fetched from: ${endpoint}`);
+        break;
+      }
+    } catch (error) {
+      console.log(`Binance endpoint failed: ${endpoint} - ${error.message}`);
+      continue;
+    }
+  }
+  
+  if (response?.data && Array.isArray(response.data)) {
+    const rows = response.data;
     const map = new Map(
       rows.map((row) => [String(row.symbol || "").toUpperCase(), row])
     );
@@ -536,11 +569,9 @@ async function getBinanceHomeMarkets(symbols) {
       .map(formatMarketRow);
 
     if (result.length) return result;
-    throw new Error("Binance returned empty market rows");
-  } catch (error) {
-    console.error("Binance market list fetch failed:", error.message);
   }
 
+  // Fallback to Bybit
   try {
     const response = await axios.get(BYBIT_TICKERS_API, { timeout: 10000 });
     const list = response.data?.result?.list || [];
@@ -570,6 +601,7 @@ async function getBinanceHomeMarkets(symbols) {
     console.error("Bybit market list fetch failed:", error.message);
   }
 
+  // Fallback to KuCoin
   try {
     const response = await axios.get(KUCOIN_ALL_TICKERS_API, { timeout: 10000 });
     const list = response.data?.data?.ticker || [];
@@ -601,6 +633,7 @@ async function getBinanceHomeMarkets(symbols) {
     console.error("KuCoin market list fetch failed:", error.message);
   }
 
+  // Final fallback: fetch each symbol individually
   const result = [];
   for (const symbol of safeSymbols) {
     try {
