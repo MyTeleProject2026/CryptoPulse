@@ -2,38 +2,32 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color-scheme: dark;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-    "Segoe UI", sans-serif;
+@layer base {
+  body {
+    background-color: #000000;
+    color: #ffffff;
+  }
+  
+  /* Prevent browser UI from showing on scroll - Mobile PWA fix */
+  html {
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  body {
+    overflow-x: hidden;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
-html,
-body,
-#root {
-  width: 100%;
-  min-height: 100%;
-}
-
-/* Prevent browser UI from showing on scroll */
-html {
-  overflow-x: hidden;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-body {
-  overflow-x: hidden;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* For better mobile experience */
+/* For better mobile experience - fullscreen PWA */
 @media (max-width: 768px) {
   body {
     position: relative;
@@ -46,7 +40,7 @@ body {
   }
 }
 
-/* Hide scrollbar but keep functionality */
+/* Hide scrollbar but keep functionality - Cleaner look */
 ::-webkit-scrollbar {
   width: 4px;
   height: 4px;
@@ -57,90 +51,27 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(163, 230, 53, 0.3);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(163, 230, 53, 0.5);
 }
 
-html {
-  scroll-behavior: smooth;
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(163, 230, 53, 0.3) transparent;
 }
 
-body {
-  margin: 0;
-  min-width: 320px;
-  background:
-    radial-gradient(circle at top, rgba(124, 58, 237, 0.12), transparent 22%),
-    linear-gradient(180deg, #0b0f17 0%, #0a0e16 100%);
-  color: #ffffff;
-}
-
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-
-button,
-input,
-select,
-textarea {
-  font: inherit;
-}
-
-button {
-  cursor: pointer;
-}
-
-img {
-  display: block;
-  max-width: 100%;
-}
-
-a {
-  color: inherit;
-  text-decoration: none;
-}
-
-::-webkit-scrollbar {
-  width: 9px;
-  height: 9px;
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.28);
-  border-radius: 999px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-@layer components {
-  .glass-card {
-    @apply rounded-[28px] border border-white/10 bg-white/[0.03] shadow-[0_10px_40px_rgba(0,0,0,0.25)];
+@layer utilities {
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
   }
-
-  .section-title {
-    @apply text-xl font-bold text-white;
-  }
-
-  .section-subtitle {
-    @apply mt-1 text-sm text-slate-400;
-  }
-
-  .input-dark {
-    @apply w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-white outline-none transition focus:border-violet-500;
-  }
-
-  .btn-primary {
-    @apply rounded-2xl bg-violet-600 px-4 py-3 font-bold text-white transition hover:bg-violet-500 disabled:opacity-60;
-  }
-
-  .btn-secondary {
-    @apply rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 font-semibold text-slate-200 transition hover:bg-white/[0.06];
+  
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 }
