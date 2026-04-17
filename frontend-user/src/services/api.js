@@ -105,12 +105,12 @@ export const userApi = {
   getPortfolioAssets: (token) =>
     api.get("/api/user/portfolio-assets", authHeaders(token)),
 
-  // Add these to your adminApi object
   getNotifications: (token) =>
-    api.get("/api/admin/notifications", authHeaders(token)),
+    api.get("/api/user/notifications", authHeaders(token)),
 
   markNotificationRead: (id, token) =>
-    api.put(`/api/admin/notifications/${id}/read`, {}, authHeaders(token)),
+    api.post(`/api/user/notifications/${id}/read`, {}, authHeaders(token)),
+
   deleteNotification: (id, token) =>
     api.delete(`/api/user/notifications/${id}`, authHeaders(token)),
 
@@ -146,15 +146,16 @@ export const userApi = {
       },
     });
   },
+
   // Joint Account APIs
   requestJointAccount: (payload, token) =>
     api.post("/api/joint-account/request", payload, authHeaders(token)),
 
   getJointAccountStatus: (token) =>
     api.get("/api/joint-account/status", authHeaders(token)),
+
   getStatus: (token) => 
     api.get("/api/joint-account/status", authHeaders(token)),
-
 
   requestJointWithdrawal: (payload, token) =>
     api.post("/api/joint-account/withdraw-request", payload, authHeaders(token)),
@@ -184,6 +185,19 @@ export const userApi = {
     const cacheBuster = Date.now();
     return api.get(`/api/platform/public-settings?t=${cacheBuster}`);
   },
+
+  // Transfer APIs (User to User)
+  getMyQrCode: (token) =>
+    api.get("/api/user/qr-code", authHeaders(token)),
+
+  getUserByUid: (uid, token) =>
+    api.get(`/api/user/by-uid/${uid}`, authHeaders(token)),
+
+  sendTransfer: (payload, token) =>
+    api.post("/api/user/transfer", payload, authHeaders(token)),
+
+  getTransferHistory: (token) =>
+    api.get("/api/user/transfers", authHeaders(token)),
 };
 
 /* ---------------- MARKET ---------------- */

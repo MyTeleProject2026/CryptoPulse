@@ -624,6 +624,8 @@ export default function AssetsPage() {
   // Joint Account State
   const [jointAccount, setJointAccount] = useState(null);
   const [jointPartner, setJointPartner] = useState(null);
+  const [combinedBalance, setCombinedBalance] = useState(null);
+  const [jointBalanceData, setJointBalanceData] = useState(null);
 
   async function loadData(silent = false) {
     try {
@@ -652,7 +654,14 @@ export default function AssetsPage() {
         tasks.push(Promise.resolve({ data: { data: [] } }));
       }
 
-      const [walletRes, marketRes, openTradeRes, notificationRes, jointRes, holdingsRes] =
+      // Add combined balance API call
+      tasks.push(
+        fetch(`${import.meta.env.VITE_API_BASE_URL || "https://cryptopulse-4rhe.onrender.com"}/api/joint-account/combined-balance`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }).then(res => res.json())
+      );
+
+      const [walletRes, marketRes, openTradeRes, notificationRes, jointRes, holdingsRes, combinedRes] =
         await Promise.allSettled(tasks);
 
       if (walletRes.status === "fulfilled") {
@@ -687,42 +696,34 @@ export default function AssetsPage() {
         );
       }
 
+      // Load Combined Balance Data
+      if (combinedRes.status === "fulfilled" && combinedRes.value?.success) {
+        const balanceData = combinedRes.value.data;
+        setJointBalanceData(balanceData);
+        
+        if (balanceData.hasJointAccount) {
+          setCombinedBalance(balanceData.combinedBalance);
+          setJointPartner({
+            name: balanceData.partnerName,
+            uid: balanceData.partnerUid,
+            balance: balanceData.partnerBalance
+          });
+        } else {
+          setCombinedBalance(null);
+          setJointPartner(null);
+        }
+      }
+
       // Load Joint Account Info
       if (jointRes.status === "fulfilled" && jointRes.value?.data?.success) {
         const jointData = jointRes.value.data.data;
         if (jointData.hasJointAccount && jointData.jointAccount) {
           setJointAccount(jointData.jointAccount);
-          
-          // Get current user's UID from wallet
-          const currentUid = wallet.user?.uid;
-          const jointAccount = jointData.jointAccount;
-          
-          // Determine partner UID (the one that is NOT the current user)
-          let partnerUid = null;
-          if (jointAccount.user1_uid === currentUid) {
-            partnerUid = jointAccount.user2_uid;
-          } else if (jointAccount.user2_uid === currentUid) {
-            partnerUid = jointAccount.user1_uid;
-          }
-          
-          if (partnerUid) {
-            try {
-              const partnerRes = await fetch(`${import.meta.env.VITE_API_BASE_URL || "https://cryptopulse-4rhe.onrender.com"}/api/user/by-uid/${partnerUid}`, {
-                headers: { Authorization: `Bearer ${token}` }
-              });
-              const partnerData = await partnerRes.json();
-              if (partnerData.success) {
-                setJointPartner(partnerData.data);
-              }
-            } catch (err) {
-              console.error("Failed to load partner info:", err);
-            }
-          }
         } else {
           setJointAccount(null);
-          setJointPartner(null);
         }
       }
+
       if (holdingsRes.status === "fulfilled") {
         const rows =
           holdingsRes.value?.data?.data?.assets ||
@@ -770,13 +771,16 @@ export default function AssetsPage() {
     };
   }, []);
 
-  const totalBalance = Number(wallet.balance || 0);
+  // Use combined balance if joint account exists, otherwise use individual balance
+  const displayBalance = combinedBalance !== null ? combinedBalance : Number(wallet.balance || 0);
+  const totalBalance = displayBalance;
+  
   const normalizedHoldings = useMemo(() => {
     if (holdings.length > 0) {
       return normalizeHoldings(holdings, markets);
     }
-    return buildFallbackAssets(totalBalance, markets);
-  }, [holdings, totalBalance, markets]);
+    return buildFallbackAssets(Number(wallet.balance || 0), markets);
+  }, [holdings, wallet.balance, markets]);
 
   const totalSpotPnl = useMemo(() => {
     return normalizedHoldings.reduce(
@@ -840,13 +844,23 @@ export default function AssetsPage() {
         </div>
 
         <div className="mt-6">
-          <div className="text-sm text-slate-400">Est total value</div>
+          <div className="text-sm text-slate-400">
+            {combinedBalance !== null ? "Combined Total Value" : "Est total value"}
+          </div>
           <div className="mt-2 flex items-end gap-2">
             <div className="text-4xl font-bold tracking-tight text-white sm:text-5xl">
-              {formatMoney(totalBalance)}
+              {formatMoney(displayBalance)}
             </div>
             <div className="mb-1 text-lg font-semibold text-white sm:text-xl">USD</div>
           </div>
+
+          {/* Show breakdown if joint account */}
+          {jointBalanceData?.hasJointAccount && (
+            <div className="mt-2 text-xs text-slate-500">
+              Your balance: {formatMoney(jointBalanceData.userBalance)} USDT + 
+              {jointPartner?.name}'s balance: {formatMoney(jointBalanceData.partnerBalance)} USDT
+            </div>
+          )}
 
           <button
             type="button"
@@ -900,9 +914,11 @@ export default function AssetsPage() {
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <PortfolioCard
-            value={totalBalance < 0.01 ? "$<0.01" : `$${formatMoney(totalBalance)}`}
-            title="Funding"
-            subtext={`${normalizedHoldings.length} assets`}
+            value={displayBalance < 0.01 ? "$<0.01" : `$${formatMoney(displayBalance)}`}
+            title={combinedBalance !== null ? "Combined Balance" : "Funding"}
+            subtext={combinedBalance !== null && jointPartner 
+              ? `${jointPartner.name || "Partner"} + You` 
+              : `${normalizedHoldings.length} assets`}
           />
           <PortfolioCard
             value={tradingAmount < 0.01 ? "$0" : `$${formatMoney(tradingAmount)}`}
@@ -916,12 +932,12 @@ export default function AssetsPage() {
           />
         </div>
 
-        {/* Joint Account Card - Shows if user has active joint account */}
-        {jointAccount && jointPartner && (
+        {/* Joint Account Card with both users' balances */}
+        {jointAccount && jointPartner && jointBalanceData && (
           <PortfolioCard
-            value={`Connected to: ${jointPartner.name || jointPartner.email}`}
-            title="Joint Account"
-            subtext={`Account ID: ${jointAccount.account_id} • Share assets together`}
+            value={`${formatMoney(jointBalanceData.userBalance)} + ${formatMoney(jointBalanceData.partnerBalance)}`}
+            title={`Joint Account: You + ${jointPartner.name || jointPartner.uid}`}
+            subtext={`Total: ${formatMoney(jointBalanceData.combinedBalance)} USDT • Account ID: ${jointAccount.account_id}`}
             icon={Users}
             tone="text-indigo-300"
           />
@@ -967,7 +983,7 @@ export default function AssetsPage() {
           <HistoryRow
             title="Place an order"
             date={new Date().toLocaleString()}
-            amount={`-${formatMoney(totalBalance > 0 ? Math.min(totalBalance, 371) : 0)} USDT`}
+            amount={`-${formatMoney(displayBalance > 0 ? Math.min(displayBalance, 371) : 0)} USDT`}
             negative
           />
         </div>

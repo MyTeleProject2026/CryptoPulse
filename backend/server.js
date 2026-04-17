@@ -7550,6 +7550,102 @@ app.post("/api/joint-account/request", authenticateUser, async (req, res, next) 
     next(error);
   }
 });
+/* =========================
+   JOINT ACCOUNT COMBINED BALANCE
+========================= */
+
+app.get("/api/joint-account/combined-balance", authenticateUser, async (req, res, next) => {
+  try {
+    // Get current user's UID from database
+    const [userRows] = await pool.execute(
+      "SELECT id, uid, balance FROM users WHERE id = ? LIMIT 1",
+      [req.user.id]
+    );
+    
+    if (!userRows.length) {
+      return res.json({ success: true, data: { hasJointAccount: false, combinedBalance: 0, userBalance: 0, partnerBalance: 0, partnerName: null } });
+    }
+    
+    const currentUser = userRows[0];
+    const currentUid = currentUser.uid;
+    const currentBalance = Number(currentUser.balance || 0);
+    
+    // Check if user has active joint account
+    const [jointRows] = await pool.execute(
+      `SELECT * FROM joint_accounts 
+       WHERE (user1_uid = ? OR user2_uid = ?) AND status = 'active'`,
+      [currentUid, currentUid]
+    );
+    
+    if (!jointRows.length) {
+      return res.json({ 
+        success: true, 
+        data: { 
+          hasJointAccount: false, 
+          combinedBalance: currentBalance,
+          userBalance: currentBalance,
+          partnerBalance: 0,
+          partnerName: null
+        } 
+      });
+    }
+    
+    const jointAccount = jointRows[0];
+    
+    // Get partner UID
+    let partnerUid = null;
+    if (jointAccount.user1_uid === currentUid) {
+      partnerUid = jointAccount.user2_uid;
+    } else {
+      partnerUid = jointAccount.user1_uid;
+    }
+    
+    // Get partner's balance and info
+    const [partnerRows] = await pool.execute(
+      "SELECT id, uid, name, email, balance FROM users WHERE uid = ? LIMIT 1",
+      [partnerUid]
+    );
+    
+    let partnerBalance = 0;
+    let partnerName = null;
+    
+    if (partnerRows.length) {
+      partnerBalance = Number(partnerRows[0].balance || 0);
+      partnerName = partnerRows[0].name || partnerRows[0].email;
+    }
+    
+    const combinedBalance = currentBalance + partnerBalance;
+    
+    res.json({
+      success: true,
+      data: {
+        hasJointAccount: true,
+        combinedBalance: combinedBalance,
+        userBalance: currentBalance,
+        partnerBalance: partnerBalance,
+        partnerName: partnerName,
+        partnerUid: partnerUid,
+        accountId: jointAccount.account_id
+      }
+    });
+  } catch (error) {
+    console.error("Combined balance error:", error);
+    res.json({ 
+      success: true, 
+      data: { 
+        hasJointAccount: false, 
+        combinedBalance: 0,
+        userBalance: 0,
+        partnerBalance: 0,
+        partnerName: null
+      } 
+    });
+  }
+});
+
+/* =========================
+   aDMIN JOINT ACCOUNT REQUESTS
+========================= */
 
 app.get("/api/admin/joint-account-requests", authenticateAdmin, async (req, res, next) => {
   try {

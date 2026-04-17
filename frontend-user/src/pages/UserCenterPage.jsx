@@ -29,7 +29,8 @@ import {
   Upload,
   Crop,
   Image as ImageIcon,
-  Users
+  Users,
+  Wallet,
 } from "lucide-react";
 import { userApi, getApiErrorMessage } from "../services/api";
 import { getFullImageUrl } from "../utils/image";
@@ -40,6 +41,15 @@ function getToken() {
          localStorage.getItem("token") || 
          localStorage.getItem("accessToken") || 
          "";
+}
+
+function formatMoney(value) {
+  const num = Number(value || 0);
+  if (!Number.isFinite(num)) return "0.00";
+  return num.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 function StatusBadge({ verified, label }) {
@@ -274,6 +284,7 @@ export default function UserCenterPage() {
     avatar_url: "",
     trading_fee_tier: "Regular user",
     email_verified: false,
+    balance: 0,
   });
 
   // Edit profile states
@@ -333,6 +344,7 @@ export default function UserCenterPage() {
   const [jointModalOpen, setJointModalOpen] = useState(false);
   const [jointAccountStatus, setJointAccountStatus] = useState(null);
   const [jointPartner, setJointPartner] = useState(null);
+  const [combinedBalanceData, setCombinedBalanceData] = useState(null);
   const [jointForm, setJointForm] = useState({
     partnerEmail: "",
     partnerKycNumber: "",
@@ -351,8 +363,9 @@ export default function UserCenterPage() {
   useEffect(() => {
     if (token) {
       loadJointAccountStatus();
+      loadCombinedBalance();
     }
-  }, [token]);
+  }, [token, profile.uid]);
 
   // Countdown timer
   useEffect(() => {
@@ -389,6 +402,7 @@ export default function UserCenterPage() {
           avatar_url: userData.avatar_url || "",
           trading_fee_tier: userData.trading_fee_tier || "Regular user",
           email_verified: userData.email_verified === 1,
+          balance: Number(userData.balance || 0),
         });
       }
       
@@ -414,46 +428,58 @@ export default function UserCenterPage() {
   }
 
   async function loadJointAccountStatus() {
-  try {
-    const res = await userApi.getJointAccountStatus(token);
-    if (res?.data?.success) {
-      const data = res.data.data;
-      setJointAccountStatus(data);
-      
-      // If has active joint account, fetch partner info
-      if (data.hasJointAccount && data.jointAccount) {
-        const currentUid = profile.uid;
-        const jointAccount = data.jointAccount;
+    try {
+      const res = await userApi.getJointAccountStatus(token);
+      if (res?.data?.success) {
+        const data = res.data.data;
+        setJointAccountStatus(data);
         
-        // Determine which UID is the partner (not the current user)
-        let partnerUid = null;
-        if (jointAccount.user1_uid === currentUid) {
-          partnerUid = jointAccount.user2_uid;
-        } else if (jointAccount.user2_uid === currentUid) {
-          partnerUid = jointAccount.user1_uid;
-        }
-        
-        if (partnerUid) {
-          try {
-            const partnerRes = await fetch(`${import.meta.env.VITE_API_BASE_URL || "https://cryptopulse-4rhe.onrender.com"}/api/user/by-uid/${partnerUid}`, {
-              headers: { Authorization: `Bearer ${token}` }
-            });
-            const partnerData = await partnerRes.json();
-            if (partnerData.success) {
-              setJointPartner(partnerData.data);
-            }
-          } catch (err) {
-            console.error("Failed to load partner info:", err);
+        if (data.hasJointAccount && data.jointAccount) {
+          const currentUid = profile.uid;
+          const jointAccount = data.jointAccount;
+          
+          let partnerUid = null;
+          if (jointAccount.user1_uid === currentUid) {
+            partnerUid = jointAccount.user2_uid;
+          } else if (jointAccount.user2_uid === currentUid) {
+            partnerUid = jointAccount.user1_uid;
           }
+          
+          if (partnerUid) {
+            try {
+              const partnerRes = await fetch(`${import.meta.env.VITE_API_BASE_URL || "https://cryptopulse-4rhe.onrender.com"}/api/user/by-uid/${partnerUid}`, {
+                headers: { Authorization: `Bearer ${token}` }
+              });
+              const partnerData = await partnerRes.json();
+              if (partnerData.success) {
+                setJointPartner(partnerData.data);
+              }
+            } catch (err) {
+              console.error("Failed to load partner info:", err);
+            }
+          }
+        } else {
+          setJointPartner(null);
         }
-      } else {
-        setJointPartner(null);
       }
+    } catch (err) {
+      console.error("Failed to load joint account status:", err);
     }
-  } catch (err) {
-    console.error("Failed to load joint account status:", err);
   }
-}
+
+  async function loadCombinedBalance() {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || "https://cryptopulse-4rhe.onrender.com"}/api/joint-account/combined-balance`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCombinedBalanceData(data.data);
+      }
+    } catch (err) {
+      console.error("Failed to load combined balance:", err);
+    }
+  }
 
   async function forceRefreshUserData() {
     try {
@@ -462,6 +488,7 @@ export default function UserCenterPage() {
       localStorage.removeItem("userData");
       await loadAllData();
       await loadJointAccountStatus();
+      await loadCombinedBalance();
       showSuccess("User data refreshed successfully!");
     } catch (err) {
       showError(getApiErrorMessage(err));
@@ -690,6 +717,7 @@ export default function UserCenterPage() {
         setJointModalOpen(false);
         setJointForm({ partnerEmail: "", partnerKycNumber: "" });
         await loadJointAccountStatus();
+        await loadCombinedBalance();
       } else {
         showError(res?.data?.message || "Failed to send request");
       }
@@ -720,100 +748,121 @@ export default function UserCenterPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 px-4 py-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-white">User Center</h1>
-        <p className="mt-1 text-sm text-slate-400">Profile, security, and preference settings</p>
-      </div>
-
-      {/* Refresh Button */}
-      <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4">
+    <div className="mx-auto max-w-4xl space-y-5 px-4 py-5 sm:space-y-6 sm:px-6 sm:py-6">
+      {/* Header with Balance */}
+      <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-slate-900/80 to-slate-950/80 p-4 shadow-xl sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h3 className="font-semibold text-amber-300">Need to refresh your account?</h3>
-            <p className="text-sm text-amber-200/70">
-              Click refresh to update your account status from server.
-            </p>
+            <h1 className="text-xl font-bold text-white sm:text-2xl">User Center</h1>
+            <p className="mt-0.5 text-xs text-slate-400 sm:text-sm">Profile, security, and preference settings</p>
           </div>
+          
           <button
             onClick={forceRefreshUserData}
             disabled={refreshing}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-black transition hover:bg-amber-400 disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-3 py-2 text-sm font-semibold text-black transition hover:bg-amber-400 disabled:opacity-50 sm:px-4 sm:py-2"
           >
-            <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
-            {refreshing ? "Refreshing..." : "Refresh Account"}
+            <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
+            <span className="text-xs sm:text-sm">{refreshing ? "Refreshing..." : "Refresh"}</span>
           </button>
+        </div>
+        
+        {/* Balance Display */}
+        <div className="mt-4 rounded-xl border border-white/10 bg-black/30 p-3 sm:p-4">
+          <div className="flex items-center gap-2 text-xs text-slate-400 sm:text-sm">
+            <Wallet size={14} />
+            <span>Wallet Balance</span>
+          </div>
+          <div className="mt-1 text-2xl font-bold text-white sm:text-3xl">
+            {formatMoney(profile.balance)} USDT
+          </div>
+          
+          {/* Combined Balance for Joint Account */}
+          {combinedBalanceData?.hasJointAccount && (
+            <div className="mt-3 rounded-lg bg-indigo-500/10 p-2 sm:p-3">
+              <div className="flex items-center gap-2 text-xs text-indigo-300">
+                <Users size={12} />
+                <span>Joint Account Combined Balance</span>
+              </div>
+              <div className="mt-1 text-lg font-bold text-white sm:text-xl">
+                {formatMoney(combinedBalanceData.combinedBalance)} USDT
+              </div>
+              <div className="mt-1 text-[10px] text-slate-400 sm:text-xs">
+                You: {formatMoney(combinedBalanceData.userBalance)} USDT + 
+                {jointPartner?.name || "Partner"}: {formatMoney(combinedBalanceData.partnerBalance)} USDT
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-white/10">
+      {/* Tabs - Mobile friendly */}
+      <div className="flex rounded-xl border border-white/10 bg-slate-900/50 p-1">
         <button
           onClick={() => setActiveTab("profile")}
-          className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition ${
+          className={`flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-2 text-xs font-medium transition sm:gap-2 sm:px-4 sm:py-3 sm:text-sm ${
             activeTab === "profile"
-              ? "border-b-2 border-cyan-500 text-cyan-400"
+              ? "bg-cyan-500 text-black"
               : "text-slate-400 hover:text-white"
           }`}
         >
-          <User size={16} />
-          Profile
+          <User size={14} className="sm:h-4 sm:w-4" />
+          <span>Profile</span>
         </button>
         <button
           onClick={() => setActiveTab("security")}
-          className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition ${
+          className={`flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-2 text-xs font-medium transition sm:gap-2 sm:px-4 sm:py-3 sm:text-sm ${
             activeTab === "security"
-              ? "border-b-2 border-cyan-500 text-cyan-400"
+              ? "bg-cyan-500 text-black"
               : "text-slate-400 hover:text-white"
           }`}
         >
-          <Shield size={16} />
-          Security
+          <Shield size={14} className="sm:h-4 sm:w-4" />
+          <span>Security</span>
         </button>
         <button
           onClick={() => setActiveTab("preferences")}
-          className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition ${
+          className={`flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-2 text-xs font-medium transition sm:gap-2 sm:px-4 sm:py-3 sm:text-sm ${
             activeTab === "preferences"
-              ? "border-b-2 border-cyan-500 text-cyan-400"
+              ? "bg-cyan-500 text-black"
               : "text-slate-400 hover:text-white"
           }`}
         >
-          <Settings size={16} />
-          Preferences
+          <Settings size={14} className="sm:h-4 sm:w-4" />
+          <span>Settings</span>
         </button>
       </div>
 
       {/* ==================== PROFILE TAB ==================== */}
       {activeTab === "profile" && (
-        <div className="space-y-5">
-          {/* Profile Header Card */}
-          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-5">
-            <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:text-left">
-              <div className="h-20 w-20 overflow-hidden rounded-full border border-white/10 bg-white/[0.03]">
+        <div className="space-y-4 sm:space-y-5">
+          {/* Profile Header Card - Mobile friendly */}
+          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-4 sm:p-5">
+            <div className="flex flex-col items-center gap-3 text-center sm:flex-row sm:text-left">
+              <div className="h-16 w-16 overflow-hidden rounded-full border border-white/10 bg-white/[0.03] sm:h-20 sm:w-20">
                 {avatarUrl ? (
                   <img src={avatarUrl} alt="avatar" className="h-full w-full object-cover" />
                 ) : (
-                  <span className="flex h-full w-full items-center justify-center text-2xl text-white">
+                  <span className="flex h-full w-full items-center justify-center text-xl text-white sm:text-2xl">
                     {profile.email?.[0]?.toUpperCase() || "U"}
                   </span>
                 )}
               </div>
               <div className="flex-1">
-                <h2 className="text-xl font-bold text-white">{profile.name || "User"}</h2>
-                <p className="text-sm text-slate-400">{profile.email}</p>
-                <div className="mt-2 flex flex-wrap justify-center gap-2 sm:justify-start">
-                  <span className={`rounded-full px-3 py-1 text-xs ${getKycClass(profile.kyc_status)}`}>
+                <h2 className="text-base font-bold text-white sm:text-xl">{profile.name || "User"}</h2>
+                <p className="text-xs text-slate-400 sm:text-sm">{profile.email}</p>
+                <div className="mt-2 flex flex-wrap justify-center gap-1.5 sm:justify-start sm:gap-2">
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] sm:px-3 sm:py-1 sm:text-xs ${getKycClass(profile.kyc_status)}`}>
                     KYC: {getKycText(profile.kyc_status)}
                   </span>
-                  <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-slate-300">
+                  <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] text-slate-300 sm:px-3 sm:py-1 sm:text-xs">
                     {profile.trading_fee_tier || "Regular user"}
                   </span>
                 </div>
               </div>
               <button
                 onClick={openEditProfile}
-                className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white transition hover:bg-white/10"
+                className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white transition hover:bg-white/10 sm:px-4 sm:py-2 sm:text-sm"
               >
                 Edit profile
               </button>
@@ -821,9 +870,9 @@ export default function UserCenterPage() {
           </div>
 
           {/* Account Information Card */}
-          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-5">
-            <h3 className="mb-4 font-semibold text-white">Account information</h3>
-            <div className="space-y-3 text-sm">
+          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-4 sm:p-5">
+            <h3 className="mb-3 text-base font-semibold text-white sm:mb-4 sm:text-lg">Account information</h3>
+            <div className="space-y-2 text-xs sm:space-y-3 sm:text-sm">
               <div className="flex justify-between border-b border-white/5 pb-2">
                 <span className="text-slate-400">UID</span>
                 <span className="text-white">{profile.uid || "--"}</span>
@@ -834,7 +883,7 @@ export default function UserCenterPage() {
               </div>
               <div className="flex justify-between border-b border-white/5 pb-2">
                 <span className="text-slate-400">Identity verification</span>
-                <span className={`rounded-full px-3 py-1 text-xs ${getKycClass(profile.kyc_status)}`}>
+                <span className={`rounded-full px-2 py-0.5 text-[10px] sm:px-3 sm:py-1 sm:text-xs ${getKycClass(profile.kyc_status)}`}>
                   {getKycText(profile.kyc_status)}
                 </span>
               </div>
@@ -854,25 +903,24 @@ export default function UserCenterPage() {
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
               <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-5">
                 <div className="mb-5 flex items-center justify-between">
-                  <h3 className="text-xl font-bold text-white">Edit profile</h3>
+                  <h3 className="text-lg font-bold text-white sm:text-xl">Edit profile</h3>
                   <button onClick={closeEditProfile} className="text-slate-400 hover:text-white">
                     <X size={20} />
                   </button>
                 </div>
                 <div className="space-y-5">
-                  {/* Avatar Section */}
                   <div className="flex flex-col items-center">
-                    <div className="relative h-24 w-24 overflow-hidden rounded-full bg-white/5 ring-1 ring-white/10">
+                    <div className="relative h-20 w-20 overflow-hidden rounded-full bg-white/5 ring-1 ring-white/10 sm:h-24 sm:w-24">
                       {editAvatarSrc ? (
                         <img src={editAvatarSrc} alt="Preview" className="h-full w-full object-cover" />
                       ) : (
-                        <User size={36} className="m-auto mt-6 text-slate-400" />
+                        <User size={28} className="m-auto mt-5 text-slate-400 sm:size-36 sm:mt-6" />
                       )}
                     </div>
                     
                     <div className="mt-3 flex gap-2">
-                      <label className="cursor-pointer rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white transition hover:bg-white/10">
-                        <Upload size={14} className="mr-1 inline" />
+                      <label className="cursor-pointer rounded-xl border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-white transition hover:bg-white/10 sm:px-3 sm:py-2 sm:text-sm">
+                        <Upload size={12} className="mr-1 inline sm:h-4 sm:w-4" />
                         Gallery
                         <input
                           ref={fileInputRef}
@@ -886,8 +934,8 @@ export default function UserCenterPage() {
                         />
                       </label>
                       
-                      <label className="cursor-pointer rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white transition hover:bg-white/10">
-                        <Camera size={14} className="mr-1 inline" />
+                      <label className="cursor-pointer rounded-xl border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-white transition hover:bg-white/10 sm:px-3 sm:py-2 sm:text-sm">
+                        <Camera size={12} className="mr-1 inline sm:h-4 sm:w-4" />
                         Camera
                         <input
                           ref={cameraInputRef}
@@ -899,10 +947,9 @@ export default function UserCenterPage() {
                         />
                       </label>
                     </div>
-                    <p className="mt-2 text-xs text-slate-500">Click Gallery or Camera to upload</p>
+                    <p className="mt-2 text-[10px] text-slate-500 sm:text-xs">Click Gallery or Camera to upload</p>
                   </div>
 
-                  {/* Name Input */}
                   <div>
                     <label className="mb-2 block text-sm text-slate-400">Profile name</label>
                     <input
@@ -910,23 +957,22 @@ export default function UserCenterPage() {
                       value={editForm.name}
                       onChange={handleEditProfileChange}
                       placeholder="Enter your name"
-                      className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none focus:border-cyan-500"
+                      className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-sm text-white outline-none focus:border-cyan-500"
                     />
                   </div>
 
-                  {/* Action Buttons */}
                   <div className="flex gap-3">
                     <button 
                       onClick={handleSaveProfile} 
                       disabled={profileSaving} 
-                      className="flex-1 rounded-xl bg-cyan-500 py-2 font-semibold text-black transition hover:bg-cyan-400 disabled:opacity-50"
+                      className="flex-1 rounded-xl bg-cyan-500 py-2 text-sm font-semibold text-black transition hover:bg-cyan-400 disabled:opacity-50"
                     >
                       <Save size={14} className="mr-1 inline" />
-                      {profileSaving ? "Saving..." : "Save Changes"}
+                      {profileSaving ? "Saving..." : "Save"}
                     </button>
                     <button 
                       onClick={closeEditProfile} 
-                      className="flex-1 rounded-xl border border-white/10 py-2 text-white transition hover:bg-white/5"
+                      className="flex-1 rounded-xl border border-white/10 py-2 text-sm text-white transition hover:bg-white/5"
                     >
                       Cancel
                     </button>
@@ -952,24 +998,24 @@ export default function UserCenterPage() {
 
       {/* ==================== SECURITY TAB ==================== */}
       {activeTab === "security" && (
-        <div className="space-y-5">
+        <div className="space-y-4 sm:space-y-5">
           {/* Email Verification */}
-          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-5">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-4 sm:p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-start gap-3">
-                <div className="rounded-full bg-cyan-500/10 p-2">
-                  <Mail className="h-5 w-5 text-cyan-400" />
+                <div className="rounded-full bg-cyan-500/10 p-1.5 sm:p-2">
+                  <Mail className="h-4 w-4 text-cyan-400 sm:h-5 sm:w-5" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-white">Email Verification</h3>
-                  <p className="text-sm text-slate-400">{profile.email}</p>
-                  <div className="mt-2">
+                  <h3 className="text-sm font-semibold text-white sm:text-base">Email Verification</h3>
+                  <p className="text-xs text-slate-400 sm:text-sm">{profile.email}</p>
+                  <div className="mt-1.5">
                     <StatusBadge verified={profile.email_verified} label={profile.email_verified ? "Verified" : "Not Verified"} />
                   </div>
                 </div>
               </div>
               {!profile.email_verified && (
-                <button onClick={() => setVerifyModalOpen(true)} className="rounded-xl bg-cyan-500 px-4 py-2 text-sm font-semibold text-black">
+                <button onClick={() => setVerifyModalOpen(true)} className="rounded-xl bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-black sm:px-4 sm:py-2 sm:text-sm">
                   Verify Email
                 </button>
               )}
@@ -977,75 +1023,87 @@ export default function UserCenterPage() {
           </div>
 
           {/* Transaction Passcode */}
-          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-5">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-4 sm:p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-start gap-3">
-                <div className="rounded-full bg-purple-500/10 p-2">
-                  <Lock className="h-5 w-5 text-purple-400" />
+                <div className="rounded-full bg-purple-500/10 p-1.5 sm:p-2">
+                  <Lock className="h-4 w-4 text-purple-400 sm:h-5 sm:w-5" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-white">Transaction Passcode</h3>
-                  <p className="text-sm text-slate-400">
+                  <h3 className="text-sm font-semibold text-white sm:text-base">Transaction Passcode</h3>
+                  <p className="text-xs text-slate-400 sm:text-sm">
                     {securityStatus.hasPasscode ? "Passcode is set. Used for sensitive operations." : "No passcode set. Set one to secure your account."}
                   </p>
-                  <div className="mt-2">
+                  <div className="mt-1.5">
                     <StatusBadge verified={securityStatus.hasPasscode} label={securityStatus.hasPasscode ? "Enabled" : "Not Set"} />
                   </div>
                 </div>
               </div>
-              <button onClick={() => setPasscodeModalOpen(true)} className={`rounded-xl px-4 py-2 text-sm font-semibold ${securityStatus.hasPasscode ? "border border-white/10 bg-white/5 text-white" : "bg-purple-500 text-black"}`}>
-                <KeyRound size={14} className="mr-1 inline" />
-                {securityStatus.hasPasscode ? "Change Passcode" : "Set Passcode"}
+              <button onClick={() => setPasscodeModalOpen(true)} className={`rounded-xl px-3 py-1.5 text-xs font-semibold sm:px-4 sm:py-2 sm:text-sm ${securityStatus.hasPasscode ? "border border-white/10 bg-white/5 text-white" : "bg-purple-500 text-black"}`}>
+                <KeyRound size={12} className="mr-1 inline sm:h-4 sm:w-4" />
+                {securityStatus.hasPasscode ? "Change" : "Set"}
               </button>
             </div>
           </div>
 
           {/* 2FA Section */}
-          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-5">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-4 sm:p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-start gap-3">
-                <div className="rounded-full bg-emerald-500/10 p-2">
-                  <Smartphone className="h-5 w-5 text-emerald-400" />
+                <div className="rounded-full bg-emerald-500/10 p-1.5 sm:p-2">
+                  <Smartphone className="h-4 w-4 text-emerald-400 sm:h-5 sm:w-5" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-white">Two-Factor Authentication</h3>
-                  <p className="text-sm text-slate-400">
+                  <h3 className="text-sm font-semibold text-white sm:text-base">Two-Factor Authentication</h3>
+                  <p className="text-xs text-slate-400 sm:text-sm">
                     {securityStatus.twofaEnabled ? "2FA is enabled. Your account is more secure." : "Enhance security with 2FA protection."}
                   </p>
-                  <div className="mt-2">
+                  <div className="mt-1.5">
                     <StatusBadge verified={securityStatus.twofaEnabled} label={securityStatus.twofaEnabled ? "Enabled" : "Disabled"} />
                   </div>
                 </div>
               </div>
-              <button onClick={() => securityStatus.hasPasscode ? setVerifyPasscodeModalOpen(true) : setPasscodeModalOpen(true)} className={`rounded-xl px-4 py-2 text-sm font-semibold ${securityStatus.twofaEnabled ? "border border-white/10 bg-white/5 text-white" : "bg-emerald-500 text-black"}`}>
-                <Shield size={14} className="mr-1 inline" />
-                {securityStatus.twofaEnabled ? "Disable 2FA" : "Enable 2FA"}
+              <button onClick={() => securityStatus.hasPasscode ? setVerifyPasscodeModalOpen(true) : setPasscodeModalOpen(true)} className={`rounded-xl px-3 py-1.5 text-xs font-semibold sm:px-4 sm:py-2 sm:text-sm ${securityStatus.twofaEnabled ? "border border-white/10 bg-white/5 text-white" : "bg-emerald-500 text-black"}`}>
+                <Shield size={12} className="mr-1 inline sm:h-4 sm:w-4" />
+                {securityStatus.twofaEnabled ? "Disable" : "Enable"}
               </button>
             </div>
           </div>
 
-          {/* Joint Account Section - FIXED */}
-          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-5">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          {/* Joint Account Section */}
+          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-4 sm:p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex min-w-0 flex-1 items-start gap-3">
-                <div className="shrink-0 rounded-full bg-indigo-500/10 p-2">
-                  <Users className="h-5 w-5 text-indigo-400" />
+                <div className="shrink-0 rounded-full bg-indigo-500/10 p-1.5 sm:p-2">
+                  <Users className="h-4 w-4 text-indigo-400 sm:h-5 sm:w-5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h3 className="font-semibold text-white">Joint Account</h3>
-                  <p className="text-sm text-slate-400 break-words">
+                  <h3 className="text-sm font-semibold text-white sm:text-base">Joint Account</h3>
+                  <p className="text-xs text-slate-400 break-words sm:text-sm">
                     Connect with another user to share balances and manage assets together
                   </p>
                   {jointAccountStatus?.hasJointAccount && (
                     <div className="mt-2">
                       <StatusBadge verified={true} label="Active Joint Account" />
                       <p className="mt-1 text-xs text-slate-500 break-all">
-                        Account ID: {jointAccountStatus.jointAccount?.account_id}
+                        ID: {jointAccountStatus.jointAccount?.account_id}
                       </p>
                       {jointPartner && (
                         <p className="mt-1 text-xs text-indigo-300 break-words">
-                          Connected with: {jointPartner.name || jointPartner.email}
+                          Connected: {jointPartner.name || jointPartner.email}
                         </p>
+                      )}
+                      {combinedBalanceData?.hasJointAccount && (
+                        <div className="mt-2 rounded-lg bg-indigo-500/10 p-2">
+                          <div className="text-[10px] text-indigo-300 sm:text-xs">Combined Balance</div>
+                          <div className="text-sm font-bold text-white sm:text-base">
+                            {formatMoney(combinedBalanceData.combinedBalance)} USDT
+                          </div>
+                          <div className="mt-0.5 text-[9px] text-slate-400 sm:text-[10px]">
+                            You: {formatMoney(combinedBalanceData.userBalance)} + 
+                            Partner: {formatMoney(combinedBalanceData.partnerBalance)}
+                          </div>
+                        </div>
                       )}
                     </div>
                   )}
@@ -1053,7 +1111,7 @@ export default function UserCenterPage() {
                     <div className="mt-2">
                       <StatusBadge verified={false} label="Request Pending Approval" />
                       <p className="mt-1 text-xs text-amber-300">
-                        Awaiting admin approval for your joint account request
+                        Awaiting admin approval
                       </p>
                     </div>
                   )}
@@ -1064,17 +1122,17 @@ export default function UserCenterPage() {
                 {!jointAccountStatus?.hasJointAccount && !jointAccountStatus?.pendingRequest ? (
                   <button
                     onClick={() => setJointModalOpen(true)}
-                    className="whitespace-nowrap rounded-xl bg-indigo-500 px-4 py-2 text-sm font-semibold text-black hover:bg-indigo-400 transition"
+                    className="whitespace-nowrap rounded-xl bg-indigo-500 px-3 py-1.5 text-xs font-semibold text-black hover:bg-indigo-400 transition sm:px-4 sm:py-2 sm:text-sm"
                   >
-                    Request Joint Account
+                    Request
                   </button>
                 ) : jointAccountStatus?.pendingRequest ? (
-                  <span className="inline-block whitespace-nowrap rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-2 text-sm text-amber-300">
-                    Awaiting Admin Approval
+                  <span className="inline-block whitespace-nowrap rounded-xl border border-amber-500/20 bg-amber-500/10 px-2 py-1.5 text-xs text-amber-300 sm:px-3 sm:py-2 sm:text-sm">
+                    Pending
                   </span>
                 ) : (
-                  <span className="inline-block whitespace-nowrap rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-300">
-                    Joint Account Active
+                  <span className="inline-block whitespace-nowrap rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-2 py-1.5 text-xs text-emerald-300 sm:px-3 sm:py-2 sm:text-sm">
+                    Active
                   </span>
                 )}
               </div>
@@ -1085,21 +1143,21 @@ export default function UserCenterPage() {
 
       {/* ==================== PREFERENCES TAB ==================== */}
       {activeTab === "preferences" && (
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           {/* Language */}
-          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-5">
-            <div className="flex items-center justify-between">
+          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-4 sm:p-5">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
-                <Languages className="h-5 w-5 text-cyan-400" />
+                <Languages className="h-4 w-4 text-cyan-400 sm:h-5 sm:w-5" />
                 <div>
-                  <h3 className="font-semibold text-white">Language</h3>
+                  <h3 className="text-sm font-semibold text-white sm:text-base">Language</h3>
                   <p className="text-xs text-slate-400">Choose your preferred language</p>
                 </div>
               </div>
               <select
                 value={preferences.language}
                 onChange={(e) => updatePreference("language", e.target.value)}
-                className="rounded-xl border border-white/10 bg-slate-800 px-3 py-2 text-white"
+                className="rounded-xl border border-white/10 bg-slate-800 px-2 py-1.5 text-xs text-white sm:px-3 sm:py-2 sm:text-sm"
               >
                 <option>English</option>
                 <option>Spanish</option>
@@ -1112,19 +1170,19 @@ export default function UserCenterPage() {
           </div>
 
           {/* Currency */}
-          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-5">
-            <div className="flex items-center justify-between">
+          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-4 sm:p-5">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
-                <DollarSign className="h-5 w-5 text-emerald-400" />
+                <DollarSign className="h-4 w-4 text-emerald-400 sm:h-5 sm:w-5" />
                 <div>
-                  <h3 className="font-semibold text-white">Currency</h3>
+                  <h3 className="text-sm font-semibold text-white sm:text-base">Currency</h3>
                   <p className="text-xs text-slate-400">Display currency for assets</p>
                 </div>
               </div>
               <select
                 value={preferences.currency}
                 onChange={(e) => updatePreference("currency", e.target.value)}
-                className="rounded-xl border border-white/10 bg-slate-800 px-3 py-2 text-white"
+                className="rounded-xl border border-white/10 bg-slate-800 px-2 py-1.5 text-xs text-white sm:px-3 sm:py-2 sm:text-sm"
               >
                 <option>USD</option>
                 <option>EUR</option>
@@ -1136,19 +1194,19 @@ export default function UserCenterPage() {
           </div>
 
           {/* Appearance */}
-          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-5">
-            <div className="flex items-center justify-between">
+          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-4 sm:p-5">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
-                {preferences.appearance === "light" ? <Sun className="h-5 w-5 text-yellow-400" /> : preferences.appearance === "dark" ? <Moon className="h-5 w-5 text-slate-400" /> : <Monitor className="h-5 w-5 text-blue-400" />}
+                {preferences.appearance === "light" ? <Sun className="h-4 w-4 text-yellow-400" /> : preferences.appearance === "dark" ? <Moon className="h-4 w-4 text-slate-400" /> : <Monitor className="h-4 w-4 text-blue-400" />}
                 <div>
-                  <h3 className="font-semibold text-white">Appearance</h3>
+                  <h3 className="text-sm font-semibold text-white sm:text-base">Appearance</h3>
                   <p className="text-xs text-slate-400">Light, Dark, or System default</p>
                 </div>
               </div>
               <select
                 value={preferences.appearance}
                 onChange={(e) => updatePreference("appearance", e.target.value)}
-                className="rounded-xl border border-white/10 bg-slate-800 px-3 py-2 text-white"
+                className="rounded-xl border border-white/10 bg-slate-800 px-2 py-1.5 text-xs text-white sm:px-3 sm:py-2 sm:text-sm"
               >
                 <option value="light">Light</option>
                 <option value="dark">Dark</option>
@@ -1158,76 +1216,76 @@ export default function UserCenterPage() {
           </div>
 
           {/* Notifications */}
-          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-5">
+          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-4 sm:p-5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Bell className="h-5 w-5 text-amber-400" />
+                <Bell className="h-4 w-4 text-amber-400 sm:h-5 sm:w-5" />
                 <div>
-                  <h3 className="font-semibold text-white">Notifications</h3>
+                  <h3 className="text-sm font-semibold text-white sm:text-base">Notifications</h3>
                   <p className="text-xs text-slate-400">Push notifications and alerts</p>
                 </div>
               </div>
               <button
                 onClick={() => updatePreference("notifications", !preferences.notifications)}
-                className={`h-6 w-11 rounded-full transition ${preferences.notifications ? "bg-cyan-500" : "bg-slate-700"}`}
+                className={`h-5 w-10 rounded-full transition sm:h-6 sm:w-11 ${preferences.notifications ? "bg-cyan-500" : "bg-slate-700"}`}
               >
-                <div className={`h-5 w-5 rounded-full bg-white transition ${preferences.notifications ? "ml-5" : "ml-0.5"} mt-0.5`} />
+                <div className={`h-4 w-4 rounded-full bg-white transition ${preferences.notifications ? "ml-5 sm:ml-6" : "ml-0.5"} mt-0.5 sm:h-5 sm:w-5`} />
               </button>
             </div>
           </div>
 
           {/* Haptic Feedback */}
-          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-5">
+          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-4 sm:p-5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Vibrate className="h-5 w-5 text-purple-400" />
+                <Vibrate className="h-4 w-4 text-purple-400 sm:h-5 sm:w-5" />
                 <div>
-                  <h3 className="font-semibold text-white">Haptic feedback</h3>
+                  <h3 className="text-sm font-semibold text-white sm:text-base">Haptic feedback</h3>
                   <p className="text-xs text-slate-400">Vibration on actions</p>
                 </div>
               </div>
               <button
                 onClick={() => updatePreference("hapticFeedback", !preferences.hapticFeedback)}
-                className={`h-6 w-11 rounded-full transition ${preferences.hapticFeedback ? "bg-cyan-500" : "bg-slate-700"}`}
+                className={`h-5 w-10 rounded-full transition sm:h-6 sm:w-11 ${preferences.hapticFeedback ? "bg-cyan-500" : "bg-slate-700"}`}
               >
-                <div className={`h-5 w-5 rounded-full bg-white transition ${preferences.hapticFeedback ? "ml-5" : "ml-0.5"} mt-0.5`} />
+                <div className={`h-4 w-4 rounded-full bg-white transition ${preferences.hapticFeedback ? "ml-5 sm:ml-6" : "ml-0.5"} mt-0.5 sm:h-5 sm:w-5`} />
               </button>
             </div>
           </div>
 
           {/* Sound Effects */}
-          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-5">
+          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-4 sm:p-5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Volume2 className="h-5 w-5 text-blue-400" />
+                <Volume2 className="h-4 w-4 text-blue-400 sm:h-5 sm:w-5" />
                 <div>
-                  <h3 className="font-semibold text-white">Sound effects</h3>
+                  <h3 className="text-sm font-semibold text-white sm:text-base">Sound effects</h3>
                   <p className="text-xs text-slate-400">Play sounds on actions</p>
                 </div>
               </div>
               <button
                 onClick={() => updatePreference("soundEffects", !preferences.soundEffects)}
-                className={`h-6 w-11 rounded-full transition ${preferences.soundEffects ? "bg-cyan-500" : "bg-slate-700"}`}
+                className={`h-5 w-10 rounded-full transition sm:h-6 sm:w-11 ${preferences.soundEffects ? "bg-cyan-500" : "bg-slate-700"}`}
               >
-                <div className={`h-5 w-5 rounded-full bg-white transition ${preferences.soundEffects ? "ml-5" : "ml-0.5"} mt-0.5`} />
+                <div className={`h-4 w-4 rounded-full bg-white transition ${preferences.soundEffects ? "ml-5 sm:ml-6" : "ml-0.5"} mt-0.5 sm:h-5 sm:w-5`} />
               </button>
             </div>
           </div>
 
           {/* Chart Timezone */}
-          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-5">
-            <div className="flex items-center justify-between">
+          <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-4 sm:p-5">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
-                <Globe className="h-5 w-5 text-indigo-400" />
+                <Globe className="h-4 w-4 text-indigo-400 sm:h-5 sm:w-5" />
                 <div>
-                  <h3 className="font-semibold text-white">Chart timezone</h3>
+                  <h3 className="text-sm font-semibold text-white sm:text-base">Chart timezone</h3>
                   <p className="text-xs text-slate-400">24h change & chart timezone</p>
                 </div>
               </div>
               <select
                 value={preferences.chartTimezone}
                 onChange={(e) => updatePreference("chartTimezone", e.target.value)}
-                className="rounded-xl border border-white/10 bg-slate-800 px-3 py-2 text-white"
+                className="rounded-xl border border-white/10 bg-slate-800 px-2 py-1.5 text-xs text-white sm:px-3 sm:py-2 sm:text-sm"
               >
                 <option>UTC</option>
                 <option>EST</option>
@@ -1246,8 +1304,8 @@ export default function UserCenterPage() {
       {/* Set Passcode Modal */}
       {passcodeModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-6">
-            <h2 className="mb-4 text-xl font-bold text-white">{securityStatus.hasPasscode ? "Change Passcode" : "Set Passcode"}</h2>
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-5 sm:p-6">
+            <h2 className="mb-4 text-lg font-bold text-white sm:text-xl">{securityStatus.hasPasscode ? "Change Passcode" : "Set Passcode"}</h2>
             <div className="space-y-4">
               <div>
                 <label className="mb-2 block text-sm text-slate-400">Enter Passcode (min 4 digits)</label>
@@ -1257,7 +1315,7 @@ export default function UserCenterPage() {
                     value={passcode}
                     onChange={(e) => setPasscode(e.target.value)}
                     placeholder="Enter 4-6 digit passcode"
-                    className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none focus:border-purple-500"
+                    className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-sm text-white outline-none focus:border-purple-500"
                     maxLength={6}
                   />
                   <button onClick={() => setShowPasscode(!showPasscode)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
@@ -1272,7 +1330,7 @@ export default function UserCenterPage() {
                   value={confirmPasscode}
                   onChange={(e) => setConfirmPasscode(e.target.value)}
                   placeholder="Confirm your passcode"
-                  className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none focus:border-purple-500"
+                  className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-sm text-white outline-none focus:border-purple-500"
                   maxLength={6}
                 />
               </div>
@@ -1293,15 +1351,15 @@ export default function UserCenterPage() {
       {/* Email Verification Modal */}
       {verifyModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-6">
-            <h2 className="mb-2 text-xl font-bold text-white">Verify Email</h2>
-            <p className="mb-4 text-sm text-slate-400">Verification code will be sent to {profile.email}</p>
-            <button onClick={handleSendVerificationCode} disabled={sendingCode || countdown > 0} className="w-full rounded-xl bg-cyan-500 py-3 font-semibold text-black disabled:opacity-50">
-              {sendingCode ? <RefreshCw size={18} className="mx-auto animate-spin" /> : countdown > 0 ? `Resend in ${countdown}s` : "Send Verification Code"}
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-5 sm:p-6">
+            <h2 className="mb-2 text-lg font-bold text-white sm:text-xl">Verify Email</h2>
+            <p className="mb-4 text-xs text-slate-400 sm:text-sm">Verification code will be sent to {profile.email}</p>
+            <button onClick={handleSendVerificationCode} disabled={sendingCode || countdown > 0} className="w-full rounded-xl bg-cyan-500 py-2 text-sm font-semibold text-black disabled:opacity-50 sm:py-3">
+              {sendingCode ? <RefreshCw size={16} className="mx-auto animate-spin" /> : countdown > 0 ? `Resend in ${countdown}s` : "Send Code"}
             </button>
             <div className="mt-4">
               <label className="mb-2 block text-sm text-slate-400">Enter 6-digit code</label>
-              <input type="text" value={verificationCode} onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="000000" className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-center text-2xl tracking-widest text-white outline-none focus:border-cyan-500" maxLength={6} />
+              <input type="text" value={verificationCode} onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="000000" className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-center text-xl tracking-widest text-white outline-none focus:border-cyan-500 sm:text-2xl" maxLength={6} />
             </div>
             <div className="mt-6 flex gap-3">
               <button onClick={() => { setVerifyModalOpen(false); setVerificationCode(""); setVerificationError(""); setVerificationSuccess(""); }} className="flex-1 rounded-xl border border-white/10 bg-white/5 py-2 text-white">
@@ -1318,10 +1376,10 @@ export default function UserCenterPage() {
       {/* Verify Passcode Modal */}
       {verifyPasscodeModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-6">
-            <h2 className="mb-4 text-xl font-bold text-white">Verify Passcode</h2>
-            <p className="mb-4 text-sm text-slate-400">Please enter your passcode to continue</p>
-            <input type="password" value={verifyPasscode} onChange={(e) => setVerifyPasscode(e.target.value)} placeholder="Enter your passcode" className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none focus:border-purple-500" />
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-5 sm:p-6">
+            <h2 className="mb-4 text-lg font-bold text-white sm:text-xl">Verify Passcode</h2>
+            <p className="mb-4 text-xs text-slate-400 sm:text-sm">Please enter your passcode to continue</p>
+            <input type="password" value={verifyPasscode} onChange={(e) => setVerifyPasscode(e.target.value)} placeholder="Enter your passcode" className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-sm text-white outline-none focus:border-purple-500" />
             {verifyPasscodeError && <div className="mt-3 rounded-xl bg-red-500/10 p-3 text-sm text-red-400">{verifyPasscodeError}</div>}
             <div className="mt-6 flex gap-3">
               <button onClick={() => { setVerifyPasscodeModalOpen(false); setVerifyPasscode(""); setVerifyPasscodeError(""); }} className="flex-1 rounded-xl border border-white/10 bg-white/5 py-2 text-white">
@@ -1338,9 +1396,9 @@ export default function UserCenterPage() {
       {/* Joint Account Request Modal */}
       {jointModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-6">
-            <h2 className="mb-4 text-xl font-bold text-white">Request Joint Account</h2>
-            <p className="mb-4 text-sm text-slate-400">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-5 sm:p-6">
+            <h2 className="mb-3 text-lg font-bold text-white sm:mb-4 sm:text-xl">Request Joint Account</h2>
+            <p className="mb-4 text-xs text-slate-400 sm:text-sm">
               Enter the email of the user you want to create a joint account with.
               Both users must have completed KYC verification.
             </p>
@@ -1353,7 +1411,7 @@ export default function UserCenterPage() {
                   value={jointForm.partnerEmail}
                   onChange={(e) => setJointForm(prev => ({ ...prev, partnerEmail: e.target.value }))}
                   placeholder="partner@example.com"
-                  className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none focus:border-indigo-500"
+                  className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-sm text-white outline-none focus:border-indigo-500"
                 />
               </div>
               
@@ -1364,7 +1422,7 @@ export default function UserCenterPage() {
                   value={jointForm.partnerKycNumber}
                   onChange={(e) => setJointForm(prev => ({ ...prev, partnerKycNumber: e.target.value }))}
                   placeholder="Enter KYC number if available"
-                  className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none focus:border-indigo-500"
+                  className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-sm text-white outline-none focus:border-indigo-500"
                 />
               </div>
             </div>
