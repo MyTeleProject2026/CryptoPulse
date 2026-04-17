@@ -4,9 +4,11 @@
   "description": "Crypto trading platform",
   "start_url": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
   "background_color": "#000000",
   "theme_color": "#111111",
   "orientation": "portrait",
+  "scope": "/",
   "icons": [
     {
       "src": "/cryptopulse-icon.svg",
