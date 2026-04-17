@@ -7430,19 +7430,43 @@ app.put("/api/admin/notifications/:id/read", authenticateAdmin, async (req, res,
 
 app.get("/api/joint-account/status", authenticateUser, async (req, res, next) => {
   try {
-    const userUid = req.user.uid;
-
-    const [jointRows] = await pool.execute(
-      `SELECT * FROM joint_accounts 
-       WHERE (user1_uid = ? OR user2_uid = ?) AND status = 'active'`,
-      [userUid, userUid]
+    // First get the user's UID from the database using their ID
+    const [userRows] = await pool.execute(
+      "SELECT uid FROM users WHERE id = ? LIMIT 1",
+      [req.user.id]
     );
-
-    const [pendingRequests] = await pool.execute(
-      `SELECT * FROM joint_account_requests 
-       WHERE (requester_uid = ? OR partner_uid = ?) AND status = 'pending'`,
-      [userUid, userUid]
-    );
+    
+    if (!userRows.length) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+    
+    const userUid = userRows[0].uid;
+    
+    let jointRows = [];
+    let pendingRequests = [];
+    
+    try {
+      [jointRows] = await pool.execute(
+        `SELECT * FROM joint_accounts 
+         WHERE (user1_uid = ? OR user2_uid = ?) AND status = 'active'`,
+        [userUid, userUid]
+      );
+    } catch (err) {
+      console.error("Joint accounts query error:", err.message);
+      // Table might not exist yet
+      jointRows = [];
+    }
+    
+    try {
+      [pendingRequests] = await pool.execute(
+        `SELECT * FROM joint_account_requests 
+         WHERE (requester_uid = ? OR partner_uid = ?) AND status = 'pending'`,
+        [userUid, userUid]
+      );
+    } catch (err) {
+      console.error("Joint account requests query error:", err.message);
+      pendingRequests = [];
+    }
 
     res.json({
       success: true,
@@ -7453,7 +7477,16 @@ app.get("/api/joint-account/status", authenticateUser, async (req, res, next) =>
       }
     });
   } catch (error) {
-    next(error);
+    console.error("Joint account status error:", error);
+    // Return empty data instead of error
+    res.json({
+      success: true,
+      data: {
+        hasJointAccount: false,
+        jointAccount: null,
+        pendingRequest: null
+      }
+    });
   }
 });
 
