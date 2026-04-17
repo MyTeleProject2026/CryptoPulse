@@ -7315,63 +7315,112 @@ app.delete("/api/admin/fund-rules/:id", authenticateAdmin, async (req, res, next
 });
 
 /* =========================
-   ADMIN NOTIFICATION
+   ADMIN NOTIFICATIONS
 ========================= */
 
-app.post("/api/admin/notifications/send", authenticateAdmin, async (req, res, next) => {
-  const connection = await pool.getConnection();
-
+// Get admin notifications (aggregated from various sources)
+app.get("/api/admin/notifications", authenticateAdmin, async (req, res, next) => {
   try {
-    const userId = Number(req.body.user_id);
-    const title = String(req.body.title || "").trim();
-    const message = String(req.body.message || "").trim();
-    const type = String(req.body.type || "general").trim();
+    const notifications = [];
 
-    if (!Number.isFinite(userId) || userId <= 0) {
-      throw createError(400, "Invalid user id");
+    // Pending KYC notifications
+    const [pendingKyc] = await pool.execute(
+      "SELECT COUNT(*) as count FROM user_kyc WHERE verification_status = 'pending'"
+    );
+    if (pendingKyc[0]?.count > 0) {
+      notifications.push({
+        id: `kyc-pending-${Date.now()}`,
+        type: "kyc",
+        title: "Pending KYC Submissions",
+        message: `${pendingKyc[0].count} user(s) have pending KYC verification.`,
+        is_read: false,
+        created_at: new Date().toISOString(),
+      });
     }
 
-    if (!title) throw createError(400, "Title is required");
-    if (!message) throw createError(400, "Message is required");
-
-    await connection.beginTransaction();
-
-    const [users] = await connection.execute(
-      `SELECT id
-       FROM users
-       WHERE id = ?
-       LIMIT 1`,
-      [userId]
+    // Pending Deposits
+    const [pendingDeposits] = await pool.execute(
+      "SELECT COUNT(*) as count FROM deposits WHERE status = 'pending'"
     );
+    if (pendingDeposits[0]?.count > 0) {
+      notifications.push({
+        id: `deposits-pending-${Date.now()}`,
+        type: "deposit",
+        title: "Pending Deposits",
+        message: `${pendingDeposits[0].count} deposit request(s) awaiting approval.`,
+        is_read: false,
+        created_at: new Date().toISOString(),
+      });
+    }
 
-    if (!users.length) throw createError(404, "User not found");
+    // Pending Withdrawals
+    const [pendingWithdrawals] = await pool.execute(
+      "SELECT COUNT(*) as count FROM withdrawals WHERE status = 'pending'"
+    );
+    if (pendingWithdrawals[0]?.count > 0) {
+      notifications.push({
+        id: `withdrawals-pending-${Date.now()}`,
+        type: "withdraw",
+        title: "Pending Withdrawals",
+        message: `${pendingWithdrawals[0].count} withdrawal request(s) awaiting approval.`,
+        is_read: false,
+        created_at: new Date().toISOString(),
+      });
+    }
 
-    await createUserNotification(connection, {
-      userId,
-      title,
-      message,
-      type,
-    });
+    // Pending Loans
+    const [pendingLoans] = await pool.execute(
+      "SELECT COUNT(*) as count FROM loans WHERE status = 'pending'"
+    );
+    if (pendingLoans[0]?.count > 0) {
+      notifications.push({
+        id: `loans-pending-${Date.now()}`,
+        type: "loan",
+        title: "Pending Loan Requests",
+        message: `${pendingLoans[0].count} loan request(s) awaiting approval.`,
+        is_read: false,
+        created_at: new Date().toISOString(),
+      });
+    }
 
-    await createAuditLog(connection, {
-      adminId: req.admin.id,
-      action: "send_user_notification",
-      targetUserId: userId,
-      referenceId: userId,
-      note: `Sent notification to user #${userId}: ${title}`,
-    });
+    // Pending Joint Account Requests
+    const [pendingJoint] = await pool.execute(
+      "SELECT COUNT(*) as count FROM joint_account_requests WHERE status = 'pending'"
+    );
+    if (pendingJoint[0]?.count > 0) {
+      notifications.push({
+        id: `joint-pending-${Date.now()}`,
+        type: "joint_account",
+        title: "Pending Joint Account Requests",
+        message: `${pendingJoint[0].count} joint account request(s) awaiting approval.`,
+        is_read: false,
+        created_at: new Date().toISOString(),
+      });
+    }
 
-    await connection.commit();
+    // Sort by created_at (newest first)
+    notifications.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
     res.json({
       success: true,
-      message: "Notification sent successfully",
+      data: notifications,
     });
   } catch (error) {
-    await connection.rollback();
     next(error);
-  } finally {
-    connection.release();
+  }
+});
+
+// Mark notification as read (store in memory or session)
+app.put("/api/admin/notifications/:id/read", authenticateAdmin, async (req, res, next) => {
+  try {
+    // For now, just return success
+    // In production, you would store read status in a database table
+    res.json({
+      success: true,
+      message: "Notification marked as read",
+    });
+  } catch (error) {
+    next(error);
   }
 });
 
