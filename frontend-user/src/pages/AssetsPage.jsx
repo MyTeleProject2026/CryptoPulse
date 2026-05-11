@@ -294,8 +294,14 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
   const [userUid, setUserUid] = useState("");
   const [userName, setUserName] = useState("");
   
+  // ========== ADDED: QR Code error state ==========
+  const [qrCodeError, setQrCodeError] = useState(false);
+  
   const token = localStorage.getItem("userToken") || localStorage.getItem("token") || "";
   const { showSuccess, showError } = useNotification();
+
+  // ========== ADDED: API Base URL constant ==========
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://cryptopulse-4rhe.onrender.com";
 
   useEffect(() => {
     if (isOpen && mode === "receive") {
@@ -318,16 +324,29 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
 
   async function loadMyQrCode() {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || "https://cryptopulse-4rhe.onrender.com"}/api/user/qr-code`, {
+      // ========== ADDED: Reset error state ==========
+      setQrCodeError(false);
+      const res = await fetch(`${API_BASE_URL}/api/user/qr-code`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
-      if (data.success) {
+      if (data.success && data.data?.qr_code_url) {
         setMyQrCode(data.data.qr_code_url);
+      } else {
+        setQrCodeError(true);
+        console.error("QR code generation failed:", data);
       }
     } catch (err) {
+      setQrCodeError(true);
       console.error("Failed to load QR code:", err);
     }
+  }
+
+  // ========== ADDED: Function to get full image URL ==========
+  function getFullImageUrl(url) {
+    if (!url) return null;
+    if (url.startsWith("http://") || url.startsWith("https://")) return url;
+    return `${API_BASE_URL}${url}`;
   }
 
   async function findUserByUid(uid) {
@@ -337,7 +356,7 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
     }
     try {
       setScanning(true);
-      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || "https://cryptopulse-4rhe.onrender.com"}/api/user/by-uid/${uid}`, {
+      const res = await fetch(`${API_BASE_URL}/api/user/by-uid/${uid}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -378,7 +397,7 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
 
     try {
       setLoading(true);
-      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || "https://cryptopulse-4rhe.onrender.com"}/api/user/transfer`, {
+      const res = await fetch(`${API_BASE_URL}/api/user/transfer`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -442,7 +461,7 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
             <button
               onClick={() => setMode("send")}
               className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                mode === "send" ? "bg-cyan-500 text-black" : "bg-white/5 text-white"
+                mode === "send" ? "bg-lime-400 text-black" : "bg-white/5 text-white"
               }`}
             >
               <Send size={16} className="mr-1 inline" />
@@ -451,7 +470,7 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
             <button
               onClick={() => setMode("receive")}
               className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                mode === "receive" ? "bg-cyan-500 text-black" : "bg-white/5 text-white"
+                mode === "receive" ? "bg-lime-400 text-black" : "bg-white/5 text-white"
               }`}
             >
               <QrCode size={16} className="mr-1 inline" />
@@ -472,11 +491,11 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
               <input
                 type="text"
                 placeholder="Enter recipient's UID (e.g., CP00000001)"
-                className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none focus:border-cyan-500"
+                className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none focus:border-lime-400"
                 onKeyDown={handleManualUidInput}
               />
               <p className="mt-2 text-center text-xs text-slate-500">or</p>
-              <label className="mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-cyan-500 py-3 text-sm font-semibold text-black transition hover:bg-cyan-400">
+              <label className="mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-lime-400 py-3 text-sm font-semibold text-black transition hover:bg-lime-300">
                 <Camera size={18} />
                 Scan QR Code
                 <input
@@ -498,7 +517,7 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
 
             {scanning && (
               <div className="flex items-center justify-center py-4">
-                <div className="h-6 w-6 animate-spin rounded-full border-2 border-cyan-500 border-t-transparent" />
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-lime-400 border-t-transparent" />
                 <span className="ml-2 text-sm text-slate-400">Searching...</span>
               </div>
             )}
@@ -528,7 +547,7 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="Enter amount (minimum 1 USDT)"
-                className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none focus:border-cyan-500"
+                className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none focus:border-lime-400"
               />
             </div>
 
@@ -539,14 +558,14 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="Add a note"
-                className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none focus:border-cyan-500"
+                className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none focus:border-lime-400"
               />
             </div>
 
             <button
               onClick={handleSendTransfer}
               disabled={loading || !scannedUser || !amount}
-              className="w-full rounded-xl bg-cyan-500 py-3 font-semibold text-black transition hover:bg-cyan-400 disabled:opacity-50"
+              className="w-full rounded-xl bg-lime-400 py-3 font-semibold text-black transition hover:bg-lime-300 disabled:opacity-50"
             >
               {loading ? "Sending..." : `Send ${amount || "0"} USDT`}
             </button>
@@ -557,13 +576,39 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
           <div className="space-y-4">
             <div className="rounded-xl border border-white/10 bg-slate-800 p-4 text-center">
               <p className="text-sm text-slate-400">Share this QR code to receive payments</p>
-              {myQrCode ? (
+              
+              {/* ========== FIXED: QR Code Display with error handling ========== */}
+              {myQrCode && !qrCodeError ? (
                 <div className="mt-4 flex flex-col items-center">
                   <img
-                    src={`${import.meta.env.VITE_API_BASE_URL || "https://cryptopulse-4rhe.onrender.com"}${myQrCode}`}
+                    src={getFullImageUrl(myQrCode)}
                     alt="Your QR Code"
                     className="h-48 w-48 rounded-xl border border-white/10 bg-white p-2"
+                    onError={() => setQrCodeError(true)}
                   />
+                  <button
+                    onClick={() => copyToClipboard(userUid)}
+                    className="mt-4 inline-flex items-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-sm text-white transition hover:bg-white/5"
+                  >
+                    {copied ? <Check size={16} /> : <Copy size={16} />}
+                    {copied ? "Copied!" : "Copy UID"}
+                  </button>
+                  <p className="mt-3 text-xs text-slate-500">
+                    Your UID: <span className="font-mono text-white">{userUid}</span>
+                  </p>
+                </div>
+              ) : qrCodeError ? (
+                <div className="mt-4 flex flex-col items-center">
+                  <div className="flex h-48 w-48 flex-col items-center justify-center rounded-xl border border-red-500/20 bg-red-500/10">
+                    <QrCode size={48} className="text-red-400 mb-2" />
+                    <p className="text-xs text-red-400">QR Code unavailable</p>
+                    <button
+                      onClick={loadMyQrCode}
+                      className="mt-3 rounded-lg bg-lime-400 px-3 py-1 text-xs text-black"
+                    >
+                      Retry
+                    </button>
+                  </div>
                   <button
                     onClick={() => copyToClipboard(userUid)}
                     className="mt-4 inline-flex items-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-sm text-white transition hover:bg-white/5"
@@ -577,7 +622,7 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
                 </div>
               ) : (
                 <div className="mt-4 flex h-48 items-center justify-center">
-                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500 border-t-transparent" />
+                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-lime-400 border-t-transparent" />
                 </div>
               )}
             </div>
