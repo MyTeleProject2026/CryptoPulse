@@ -62,7 +62,7 @@ function getVoucherColor(type) {
     case "withdraw":
       return "from-amber-500/20 to-amber-600/10 border-amber-400/30";
     case "trade":
-      return "from-lime-500/20 to-lime-600/10 border-lime-400/30";
+      return "from-cyan-500/20 to-lime-600/10 border-cyan-500/30";
     case "loan":
       return "from-violet-500/20 to-violet-600/10 border-violet-400/30";
     case "joint_account":
@@ -88,18 +88,79 @@ function VoucherRow({ label, value, valueClassName = "text-white" }) {
 export default function VoucherModal({ voucher, onClose }) {
   const [isVisible, setIsVisible] = useState(false);
   const [capturing, setCapturing] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
   const voucherRef = useRef(null);
+  const modalContainerRef = useRef(null);
 
   const Icon = getVoucherIcon(voucher?.type);
   const colorClass = getVoucherColor(voucher?.type);
 
+  // ========== ADDED: Reset animation when voucher changes (for multiple transactions) ==========
   useEffect(() => {
-    requestAnimationFrame(() => setIsVisible(true));
+    // Reset states when a new voucher comes in
+    setIsVisible(false);
+    setIsClosing(false);
+    
+    // Small delay then show the new voucher
+    const timer = setTimeout(() => {
+      setIsVisible(true);
+    }, 10);
+    
+    return () => clearTimeout(timer);
+  }, [voucher?.transactionId]); // Re-run when transaction ID changes (new voucher)
+
+  // ========== ADDED: Cleanup function for when component unmounts ==========
+  useEffect(() => {
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.pointerEvents = '';
+    };
+  }, []);
+
+  // Handle escape key press
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') {
+        handleClose();
+      }
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, []);
+
+  // Animate in on mount
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      setIsVisible(true);
+    });
+    // Prevent body scroll
+    document.body.style.overflow = 'hidden';
+    
+    return () => {
+      document.body.style.overflow = '';
+    };
   }, []);
 
   const handleClose = () => {
+    if (isClosing) return; // Prevent multiple close attempts
+    
+    setIsClosing(true);
     setIsVisible(false);
-    setTimeout(onClose, 250);
+    
+    // Wait for animation to complete before calling onClose
+    setTimeout(() => {
+      // SAFE CLEANUP: Only try to remove if the element exists and is a child
+      if (modalContainerRef.current && modalContainerRef.current.parentNode) {
+        // Don't manually remove - let React handle it
+      }
+      onClose();
+    }, 300);
+  };
+
+  const handleBackdropClick = (e) => {
+    if (e.target === e.currentTarget) {
+      handleClose();
+    }
   };
 
   const handleScreenshot = async () => {
@@ -108,11 +169,11 @@ export default function VoucherModal({ voucher, onClose }) {
       setCapturing(true);
       const canvas = await html2canvas(voucherRef.current, {
         scale: 2,
-        backgroundColor: "#0a0a0a",
+        backgroundColor: "#0b1630",
         logging: false,
       });
       const link = document.createElement("a");
-      link.download = `cryptopulse-${voucher?.type}-${Date.now()}.png`;
+      link.download = `CryptoPulse-${voucher?.type}-${Date.now()}.png`;
       link.href = canvas.toDataURL();
       link.click();
     } catch (error) {
@@ -220,7 +281,7 @@ export default function VoucherModal({ voucher, onClose }) {
             <VoucherRow
               label="Payout %"
               value={`${voucher.data?.payoutPercent}%`}
-              valueClassName="text-lime-300"
+              valueClassName="text-cyan-400"
             />
             <VoucherRow
               label="Est. Profit"
@@ -273,7 +334,7 @@ export default function VoucherModal({ voucher, onClose }) {
             <VoucherRow
               label="Total Repayment"
               value={`${formatAmount(voucher.data?.totalRepayment)} USDT`}
-              valueClassName="text-lime-300"
+              valueClassName="text-cyan-400"
             />
             <VoucherRow label="Status" value={voucher.data?.status || "Pending"} />
           </>
@@ -285,7 +346,7 @@ export default function VoucherModal({ voucher, onClose }) {
             <VoucherRow label="Request ID" value={`#${voucher.data?.requestId || "--"}`} />
             <VoucherRow label="Partner Email" value={voucher.data?.partnerEmail || "--"} />
             <VoucherRow label="Partner UID" value={voucher.data?.partnerUid || "--"} />
-            <VoucherRow label="Status" value="Pending Admin Approval" valueClassName="text-amber-300" />
+            <VoucherRow label="Status" value="Pending System Approval" valueClassName="text-amber-300" />
             <VoucherRow label="Requested" value={formatDateTime(voucher.data?.created_at)} />
           </>
         );
@@ -328,12 +389,13 @@ export default function VoucherModal({ voucher, onClose }) {
 
   return (
     <div
+      ref={modalContainerRef}
       className={`
-        fixed inset-0 z-[250] flex items-end justify-center bg-black/80 p-0
+        fixed inset-0 z-[250] flex items-end justify-center bg-[#050812]/80 p-0
         transition-all duration-300 sm:items-center sm:p-4
-        ${isVisible ? "bg-black/80" : "bg-black/0 pointer-events-none"}
+        ${isVisible ? "bg-[#050812]/80 opacity-100" : "bg-[#050812]/0 opacity-0 pointer-events-none"}
       `}
-      onClick={handleClose}
+      onClick={handleBackdropClick}
     >
       <div
         ref={voucherRef}
@@ -349,7 +411,7 @@ export default function VoucherModal({ voucher, onClose }) {
         <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10">
-              <Icon size={20} className="text-lime-300" />
+              <Icon size={20} className="text-cyan-400" />
             </div>
             <div>
               <div className="text-[22px] font-bold text-white">
@@ -376,7 +438,7 @@ export default function VoucherModal({ voucher, onClose }) {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
+          <div className="rounded-2xl border border-white/10 bg-[#050812]/30 p-4">
             <div className="space-y-3">{renderVoucherContent()}</div>
           </div>
 
@@ -402,7 +464,7 @@ export default function VoucherModal({ voucher, onClose }) {
               type="button"
               onClick={handleScreenshot}
               disabled={capturing}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-lime-400 px-4 py-3 text-sm font-semibold text-black transition hover:bg-lime-300 disabled:opacity-60"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-cyan-500 px-4 py-3 text-sm font-semibold text-black transition hover:bg-cyan-400 disabled:opacity-60"
             >
               {capturing ? (
                 <>
