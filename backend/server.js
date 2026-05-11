@@ -35,6 +35,13 @@ const app = express();
   }
 });
 
+// Make sure qr_codes directory exists with proper permissions
+const qrDir = path.join(__dirname, "uploads/qr_codes");
+if (!fs.existsSync(qrDir)) {
+  fs.mkdirSync(qrDir, { recursive: true });
+  console.log("Created qr_codes directory");
+}
+
 const storage = multer.diskStorage({
   destination: function (_req, file, cb) {
     if (file.fieldname === "receipt") {
