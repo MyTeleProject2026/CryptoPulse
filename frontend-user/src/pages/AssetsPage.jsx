@@ -956,4 +956,163 @@ export default function AssetsPage() {
             <button
               type="button"
               onClick={() => loadData(true)}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-white transition hover:bg-white/[0.06
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-white transition hover:bg-white/[0.06]"
+            >
+              <RefreshCw size={17} className={refreshing ? "animate-spin" : ""} />
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-6">
+          <div className="text-sm text-slate-400">
+            {combinedBalance !== null ? "Combined Total Value" : "Est total value"}
+          </div>
+          <div className="mt-2 flex items-end gap-2">
+            <div className="text-4xl font-bold tracking-tight text-white sm:text-5xl">
+              {formatMoney(displayBalance)}
+            </div>
+            <div className="mb-1 text-lg font-semibold text-white sm:text-xl">USD</div>
+          </div>
+
+          {jointBalanceData?.hasJointAccount && (
+            <div className="mt-2 text-xs text-slate-500">
+              Your balance: {formatMoney(jointBalanceData.userBalance)} USDT + 
+              {jointPartner?.name}'s balance: {formatMoney(jointBalanceData.partnerBalance)} USDT
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => navigate("/transactions")}
+            className="mt-3 inline-flex items-center gap-1.5 text-sm text-slate-400 transition hover:text-white sm:text-base"
+          >
+            <span>
+              Today&apos;s PnL {totalSpotPnl >= 0 ? "+" : "-"}$
+              {formatMoney(Math.abs(totalSpotPnl))} ({totalSpotPnl >= 0 ? "+" : ""}
+              {Number(pnlPercent).toFixed(2)}%)
+            </span>
+            <ChevronRight size={16} />
+          </button>
+        </div>
+
+        <div className="mt-6 grid grid-cols-4 gap-2 sm:gap-3">
+          <CircleAction
+            icon={ArrowDownToLine}
+            label="Deposit"
+            onClick={() => navigate("/deposit")}
+          />
+          <CircleAction
+            icon={ArrowUpToLine}
+            label="Withdraw"
+            onClick={() => navigate("/withdraw")}
+          />
+          <CircleAction
+            icon={ArrowRightLeft}
+            label="Convert"
+            onClick={() => navigate("/convert")}
+          />
+          <CircleAction
+            icon={QrCode}
+            label="Transfer"
+            onClick={() => setShowQrModal(true)}
+          />
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-white sm:text-3xl">Portfolio</h2>
+
+          <button
+            type="button"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-slate-300 transition hover:bg-white/[0.06]"
+          >
+            <SlidersHorizontal size={17} />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <PortfolioCard
+            value={displayBalance < 0.01 ? "$<0.01" : `$${formatMoney(displayBalance)}`}
+            title={combinedBalance !== null ? "Combined Balance" : "Funding"}
+            subtext={combinedBalance !== null && jointPartner 
+              ? `${jointPartner.name || "Partner"} + You` 
+              : `${normalizedHoldings.length} assets`}
+          />
+          <PortfolioCard
+            value={tradingAmount < 0.01 ? "$0" : `$${formatMoney(tradingAmount)}`}
+            title="Trading"
+            subtext={`${openTrades.length} open trade${openTrades.length === 1 ? "" : "s"}`}
+          />
+          <PortfolioCard
+            value={String(unreadNotifications)}
+            title="Notification"
+            subtext={unreadNotifications === 1 ? "Unread alert" : "Unread alerts"}
+          />
+        </div>
+
+        {jointAccount && jointPartner && jointBalanceData && (
+          <PortfolioCard
+            value={`${formatMoney(jointBalanceData.userBalance)} + ${formatMoney(jointBalanceData.partnerBalance)}`}
+            title={`Joint Account: You + ${jointPartner.name || jointPartner.uid}`}
+            subtext={`Total: ${formatMoney(jointBalanceData.combinedBalance)} USDT • Account ID: ${jointAccount.account_id}`}
+            icon={Users}
+            tone="text-lime-300"
+          />
+        )}
+      </section>
+
+      <section className="space-y-3">
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <h2 className="text-2xl font-bold text-white sm:text-3xl">Crypto</h2>
+            <div className="mt-1 flex justify-between gap-3 text-xs text-slate-500 sm:text-sm">
+              <span>Name/Amount</span>
+            </div>
+          </div>
+
+          <div className="text-right text-xs text-slate-500 sm:text-sm">
+            Value/Spot PnL
+          </div>
+        </div>
+
+        <div className="space-y-2.5">
+          {normalizedHoldings.map((item) => (
+            <AssetRow key={item.symbol} item={item} />
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-[28px] border border-white/10 bg-[#111111] p-4 shadow-[0_16px_50px_rgba(0,0,0,0.32)] sm:p-5">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-2xl font-bold text-white sm:text-3xl">
+            Recent funding history
+          </h2>
+          <button
+            type="button"
+            onClick={() => navigate("/transactions")}
+            className="text-slate-300 transition hover:text-white"
+          >
+            <ChevronRight size={20} />
+          </button>
+        </div>
+
+        <div className="mt-4">
+          <HistoryRow
+            title="Place an order"
+            date={new Date().toLocaleString()}
+            amount={`-${formatMoney(displayBalance > 0 ? Math.min(displayBalance, 371) : 0)} USDT`}
+            negative
+          />
+        </div>
+      </section>
+
+      {/* QR Transfer Modal */}
+      <QrTransferModal
+        isOpen={showQrModal}
+        onClose={() => setShowQrModal(false)}
+        onTransferComplete={handleTransferComplete}
+      />
+    </div>
+  );
+}
