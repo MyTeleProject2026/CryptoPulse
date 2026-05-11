@@ -58,7 +58,7 @@ function getCoinPriceInUsdt(symbol, markets = []) {
 
 function getCoinAccent(symbol) {
   const map = {
-    USDT: "from-cyan-400/30 to-cyan-500/10",
+    USDT: "from-lime-400/30 to-lime-500/10",
     BTC: "from-orange-400/30 to-orange-500/10",
     ETH: "from-indigo-400/30 to-indigo-500/10",
     SOL: "from-fuchsia-400/30 to-fuchsia-500/10",
@@ -183,7 +183,7 @@ function CircleAction({ icon: Icon, label, onClick }) {
       onClick={onClick}
       className="flex flex-col items-center gap-1.5 text-center"
     >
-      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-cyan-500 text-black shadow-[0_8px_24px_rgba(34,211,238,0.14)] transition hover:scale-[1.02] hover:bg-cyan-400 sm:h-14 sm:w-14">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-lime-400 text-black shadow-[0_8px_24px_rgba(163,230,53,0.14)] transition hover:scale-[1.02] hover:bg-lime-300 sm:h-14 sm:w-14">
         <Icon size={20} className="sm:h-[22px] sm:w-[22px]" />
       </div>
       <span className="text-xs font-medium text-white sm:text-sm">{label}</span>
@@ -193,7 +193,7 @@ function CircleAction({ icon: Icon, label, onClick }) {
 
 function PortfolioCard({ title, value, subtext, icon: Icon, tone = "text-white" }) {
   return (
-    <div className="rounded-[22px] border border-white/5 bg-[#0a0e1a] p-4 shadow-[0_12px_30px_rgba(0,0,0,0.22)]">
+    <div className="rounded-[22px] border border-white/5 bg-[#141414] p-4 shadow-[0_12px_30px_rgba(0,0,0,0.22)]">
       <div className="flex items-center justify-between">
         <div className="text-xs text-slate-400 sm:text-sm">{title}</div>
         {Icon && <Icon size={18} className="text-slate-500" />}
@@ -299,7 +299,7 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
   const { showSuccess, showError, showVoucher } = useNotification();
 
   // API Base URL
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://VexaTrade-4rhe.onrender.com";
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://cryptopulse-4rhe.onrender.com";
 
   useEffect(() => {
     if (isOpen && mode === "receive") {
@@ -448,14 +448,14 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#050812]/80 p-4">
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0a0e1a] p-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-5">
         <div className="mb-4 flex items-center justify-between">
           <div className="flex gap-2">
             <button
               onClick={() => setMode("send")}
               className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                mode === "send" ? "bg-cyan-500 text-black" : "bg-white/5 text-white"
+                mode === "send" ? "bg-lime-400 text-black" : "bg-white/5 text-white"
               }`}
             >
               <Send size={16} className="mr-1 inline" />
@@ -464,7 +464,7 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
             <button
               onClick={() => setMode("receive")}
               className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                mode === "receive" ? "bg-cyan-500 text-black" : "bg-white/5 text-white"
+                mode === "receive" ? "bg-lime-400 text-black" : "bg-white/5 text-white"
               }`}
             >
               <QrCode size={16} className="mr-1 inline" />
@@ -478,18 +478,18 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
 
         {mode === "send" && (
           <div className="space-y-4">
-            <div className="rounded-xl border border-white/10 bg-[#0a0e1a] p-4">
+            <div className="rounded-xl border border-white/10 bg-slate-800 p-4">
               <label className="mb-2 block text-sm text-slate-400">
                 Recipient's UID
               </label>
               <input
                 type="text"
                 placeholder="Enter recipient's UID (e.g., CP00000001)"
-                className="w-full rounded-xl border border-white/10 bg-[#0a0e1a] px-4 py-3 text-white outline-none focus:border-cyan-500"
+                className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none focus:border-lime-400"
                 onKeyDown={handleManualUidInput}
               />
               <p className="mt-2 text-center text-xs text-slate-500">or</p>
-              <label className="mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-cyan-500 py-3 text-sm font-semibold text-black transition hover:bg-cyan-400">
+              <label className="mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-lime-400 py-3 text-sm font-semibold text-black transition hover:bg-lime-300">
                 <Camera size={18} />
                 Scan QR Code
                 <input
@@ -511,7 +511,7 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
 
             {scanning && (
               <div className="flex items-center justify-center py-4">
-                <div className="h-6 w-6 animate-spin rounded-full border-2 border-cyan-500 border-t-transparent" />
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-lime-400 border-t-transparent" />
                 <span className="ml-2 text-sm text-slate-400">Searching...</span>
               </div>
             )}
@@ -541,7 +541,7 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="Enter amount (minimum 1 USDT)"
-                className="w-full rounded-xl border border-white/10 bg-[#0a0e1a] px-4 py-3 text-white outline-none focus:border-cyan-500"
+                className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none focus:border-lime-400"
               />
             </div>
 
@@ -552,14 +552,14 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="Add a note"
-                className="w-full rounded-xl border border-white/10 bg-[#0a0e1a] px-4 py-3 text-white outline-none focus:border-cyan-500"
+                className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none focus:border-lime-400"
               />
             </div>
 
             <button
               onClick={handleSendTransfer}
               disabled={loading || !scannedUser || !amount}
-              className="w-full rounded-xl bg-cyan-500 py-3 font-semibold text-black transition hover:bg-cyan-400 disabled:opacity-50"
+              className="w-full rounded-xl bg-lime-400 py-3 font-semibold text-black transition hover:bg-lime-300 disabled:opacity-50"
             >
               {loading ? "Sending..." : `Send ${amount || "0"} USDT`}
             </button>
@@ -568,7 +568,7 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
 
         {mode === "receive" && (
           <div className="space-y-4">
-            <div className="rounded-xl border border-white/10 bg-[#0a0e1a] p-4 text-center">
+            <div className="rounded-xl border border-white/10 bg-slate-800 p-4 text-center">
               <p className="text-sm text-slate-400">Share this QR code to receive payments</p>
               
               {myQrCode && !qrCodeError ? (
@@ -597,7 +597,7 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
                     <p className="text-xs text-red-400">QR Code unavailable</p>
                     <button
                       onClick={loadMyQrCode}
-                      className="mt-3 rounded-lg bg-cyan-500 px-3 py-1 text-xs text-black"
+                      className="mt-3 rounded-lg bg-lime-400 px-3 py-1 text-xs text-black"
                     >
                       Retry
                     </button>
@@ -615,12 +615,12 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
                 </div>
               ) : (
                 <div className="mt-4 flex h-48 items-center justify-center">
-                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500 border-t-transparent" />
+                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-lime-400 border-t-transparent" />
                 </div>
               )}
             </div>
 
-            <div className="rounded-xl border border-white/10 bg-[#0a0e1a] p-4">
+            <div className="rounded-xl border border-white/10 bg-slate-800 p-4">
               <h3 className="text-sm font-semibold text-white">How to receive:</h3>
               <ol className="mt-2 space-y-2 text-xs text-slate-400">
                 <li>1. Share this QR code with the sender</li>
@@ -668,7 +668,7 @@ export default function AssetsPage() {
   // ========== ADDED: Function to calculate holdings from convert transactions ==========
   async function loadHoldingsFromConvertHistory() {
     try {
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://VexaTrade-4rhe.onrender.com";
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://cryptopulse-4rhe.onrender.com";
       // Fetch convert transaction history
       const res = await fetch(`${API_BASE_URL}/api/convert/history`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -781,7 +781,7 @@ export default function AssetsPage() {
 
       // Add combined balance API call
       tasks.push(
-        fetch(`${import.meta.env.VITE_API_BASE_URL || "https://VexaTrade-4rhe.onrender.com"}/api/joint-account/combined-balance`, {
+        fetch(`${import.meta.env.VITE_API_BASE_URL || "https://cryptopulse-4rhe.onrender.com"}/api/joint-account/combined-balance`, {
           headers: { Authorization: `Bearer ${token}` }
         }).then(res => res.json())
       );
@@ -888,7 +888,7 @@ export default function AssetsPage() {
 
     const onFocus = () => loadData(true);
     const onStorage = (e) => {
-      if (e.key === "VexaTrade_assets_refresh") {
+      if (e.key === "cryptopulse_assets_refresh") {
         loadData(true);
       }
     };
@@ -942,8 +942,8 @@ export default function AssetsPage() {
 
   if (loading) {
     return (
-      <div className="space-y-5 bg-[#050812] p-3 sm:p-5">
-        <section className="rounded-[28px] border border-white/10 bg-[#0a0e1a] p-5 text-sm text-slate-300 shadow-2xl">
+      <div className="space-y-5 bg-black p-3 sm:p-5">
+        <section className="rounded-[28px] border border-white/10 bg-[#111111] p-5 text-sm text-slate-300 shadow-2xl">
           Loading assets...
         </section>
       </div>
@@ -951,182 +951,9 @@ export default function AssetsPage() {
   }
 
   return (
-    <div className="space-y-5 bg-[#050812] px-2 pb-24 pt-3 sm:px-5 xl:pb-8">
-      <section className="rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.18),transparent_18%),linear-gradient(180deg,#0a0e1a_0%,#050812_100%)] p-4 shadow-[0_18px_60px_rgba(0,0,0,0.42)] sm:p-5">
+    <div className="space-y-5 bg-black px-2 pb-24 pt-3 sm:px-5 xl:pb-8">
+      <section className="rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(163,230,53,0.18),transparent_18%),linear-gradient(180deg,#0a0a0a_0%,#050505_100%)] p-4 shadow-[0_18px_60px_rgba(0,0,0,0.42)] sm:p-5">
         <div className="flex items-center justify-between">
           <div className="text-lg font-semibold text-white sm:text-xl">Assets</div>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => navigate("/transactions")}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-white transition hover:bg-white/[0.06]"
-            >
-              <Bell size={17} />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => loadData(true)}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-white transition hover:bg-white/[0.06]"
-            >
-              <RefreshCw size={17} className={refreshing ? "animate-spin" : ""} />
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-6">
-          <div className="text-sm text-slate-400">
-            {combinedBalance !== null ? "Combined Total Value" : "Est total value"}
-          </div>
-          <div className="mt-2 flex items-end gap-2">
-            <div className="text-4xl font-bold tracking-tight text-white sm:text-5xl">
-              {formatMoney(displayBalance)}
-            </div>
-            <div className="mb-1 text-lg font-semibold text-white sm:text-xl">USD</div>
-          </div>
-
-          {/* Show breakdown if joint account */}
-          {jointBalanceData?.hasJointAccount && (
-            <div className="mt-2 text-xs text-slate-500">
-              Your balance: {formatMoney(jointBalanceData.userBalance)} USDT + 
-              {jointPartner?.name}'s balance: {formatMoney(jointBalanceData.partnerBalance)} USDT
-            </div>
-          )}
-
-          <button
-            type="button"
-            onClick={() => navigate("/transactions")}
-            className="mt-3 inline-flex items-center gap-1.5 text-sm text-slate-400 transition hover:text-white sm:text-base"
-          >
-            <span>
-              Today&apos;s PnL {totalSpotPnl >= 0 ? "+" : "-"}$
-              {formatMoney(Math.abs(totalSpotPnl))} ({totalSpotPnl >= 0 ? "+" : ""}
-              {Number(pnlPercent).toFixed(2)}%)
-            </span>
-            <ChevronRight size={16} />
-          </button>
-        </div>
-
-        <div className="mt-6 grid grid-cols-4 gap-2 sm:gap-3">
-          <CircleAction
-            icon={ArrowDownToLine}
-            label="Deposit"
-            onClick={() => navigate("/deposit")}
-          />
-          <CircleAction
-            icon={ArrowUpToLine}
-            label="Withdraw"
-            onClick={() => navigate("/withdraw")}
-          />
-          <CircleAction
-            icon={ArrowRightLeft}
-            label="Convert"
-            onClick={() => navigate("/convert")}
-          />
-          <CircleAction
-            icon={QrCode}
-            label="Transfer"
-            onClick={() => setShowQrModal(true)}
-          />
-        </div>
-      </section>
-
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-white sm:text-3xl">Portfolio</h2>
-
-          <button
-            type="button"
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-slate-300 transition hover:bg-white/[0.06]"
-          >
-            <SlidersHorizontal size={17} />
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <PortfolioCard
-            value={displayBalance < 0.01 ? "$<0.01" : `$${formatMoney(displayBalance)}`}
-            title={combinedBalance !== null ? "Combined Balance" : "Funding"}
-            subtext={combinedBalance !== null && jointPartner 
-              ? `${jointPartner.name || "Partner"} + You` 
-              : `${normalizedHoldings.length} assets`}
-          />
-          <PortfolioCard
-            value={tradingAmount < 0.01 ? "$0" : `$${formatMoney(tradingAmount)}`}
-            title="Trading"
-            subtext={`${openTrades.length} open trade${openTrades.length === 1 ? "" : "s"}`}
-          />
-          <PortfolioCard
-            value={String(unreadNotifications)}
-            title="Notification"
-            subtext={unreadNotifications === 1 ? "Unread alert" : "Unread alerts"}
-          />
-        </div>
-
-        {/* Joint Account Card with both users' balances */}
-        {jointAccount && jointPartner && jointBalanceData && (
-          <PortfolioCard
-            value={`${formatMoney(jointBalanceData.userBalance)} + ${formatMoney(jointBalanceData.partnerBalance)}`}
-            title={`Joint Account: You + ${jointPartner.name || jointPartner.uid}`}
-            subtext={`Total: ${formatMoney(jointBalanceData.combinedBalance)} USDT • Account ID: ${jointAccount.account_id}`}
-            icon={Users}
-            tone="text-cyan-300"
-          />
-        )}
-      </section>
-
-      <section className="space-y-3">
-        <div className="flex items-end justify-between gap-3">
-          <div>
-            <h2 className="text-2xl font-bold text-white sm:text-3xl">Crypto</h2>
-            <div className="mt-1 flex justify-between gap-3 text-xs text-slate-500 sm:text-sm">
-              <span>Name/Amount</span>
-            </div>
-          </div>
-
-          <div className="text-right text-xs text-slate-500 sm:text-sm">
-            Value/Spot PnL
-          </div>
-        </div>
-
-        <div className="space-y-2.5">
-          {normalizedHoldings.map((item) => (
-            <AssetRow key={item.symbol} item={item} />
-          ))}
-        </div>
-      </section>
-
-      <section className="rounded-[28px] border border-white/10 bg-[#0a0e1a] p-4 shadow-[0_16px_50px_rgba(0,0,0,0.32)] sm:p-5">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-2xl font-bold text-white sm:text-3xl">
-            Recent funding history
-          </h2>
-          <button
-            type="button"
-            onClick={() => navigate("/transactions")}
-            className="text-slate-300 transition hover:text-white"
-          >
-            <ChevronRight size={20} />
-          </button>
-        </div>
-
-        <div className="mt-4">
-          <HistoryRow
-            title="Place an order"
-            date={new Date().toLocaleString()}
-            amount={`-${formatMoney(displayBalance > 0 ? Math.min(displayBalance, 371) : 0)} USDT`}
-            negative
-          />
-        </div>
-      </section>
-
-      {/* QR Transfer Modal */}
-      <QrTransferModal
-        isOpen={showQrModal}
-        onClose={() => setShowQrModal(false)}
-        onTransferComplete={handleTransferComplete}
-      />
-    </div>
-  );
-}
+         
