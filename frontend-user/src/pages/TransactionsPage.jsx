@@ -190,7 +190,7 @@ function getNotificationTone(type) {
   const value = String(type || "").toLowerCase();
 
   if (value === "verification_code") {
-    return "text-lime-300";
+    return "text-cyan-400";
   }
 
   if (value === "security") {
@@ -255,7 +255,7 @@ function EmptyState({ tab }) {
   };
 
   return (
-    <div className="rounded-[22px] border border-white/10 bg-[#0f0f0f] px-4 py-10 text-center text-sm text-slate-500">
+    <div className="rounded-[22px] border border-white/10 bg-[#0a0e1a] px-4 py-10 text-center text-sm text-slate-500">
       {map[tab] || "No records found."}
     </div>
   );
@@ -319,6 +319,20 @@ export default function TransactionsPage() {
     }, 10000);
 
     return () => clearInterval(interval);
+  }, []);
+
+   useEffect(() => {
+    // Cleanup function to remove any stuck modals when leaving the page
+    return () => {
+      const backdrops = document.querySelectorAll('.fixed.inset-0.z-\\[250\\], .fixed.inset-0.bg-\\[\\#050812\\]\\/80');
+      backdrops.forEach(backdrop => {
+        if (backdrop && backdrop.parentNode) {
+          backdrop.parentNode.removeChild(backdrop);
+        }
+      });
+      document.body.style.overflow = '';
+      document.body.style.pointerEvents = '';
+    };
   }, []);
 
   const activityRows = useMemo(() => {
@@ -396,8 +410,8 @@ export default function TransactionsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black p-4 text-white">
-        <div className="rounded-[24px] border border-white/10 bg-[#0f0f0f] p-5 text-sm text-slate-400">
+      <div className="min-h-screen bg-[#050812] p-4 text-white">
+        <div className="rounded-[24px] border border-white/10 bg-[#0a0e1a] p-5 text-sm text-slate-400">
           Loading activity...
         </div>
       </div>
@@ -405,7 +419,7 @@ export default function TransactionsPage() {
   }
 
   return (
-    <div className="min-h-screen space-y-5 bg-black p-4 text-white">
+    <div className="min-h-screen space-y-5 bg-[#050812] p-4 text-white">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Activity</h1>
@@ -444,7 +458,7 @@ export default function TransactionsPage() {
             onClick={() => setTab(item.key)}
             className={`rounded-xl px-2 py-2.5 text-[11px] font-medium sm:text-sm ${
               tab === item.key
-                ? "bg-lime-400 text-black"
+                ? "bg-cyan-500 text-black"
                 : "border border-white/10 bg-[#111] text-slate-300"
             }`}
           >
@@ -468,7 +482,7 @@ export default function TransactionsPage() {
                   key={item.id}
                   type="button"
                   onClick={() => handleNotificationClick(item)}
-                  className="block w-full rounded-[22px] border border-white/10 bg-[#0f0f0f] p-4 text-left transition hover:bg-[#151515]"
+                  className="block w-full rounded-[22px] border border-white/10 bg-[#0a0e1a] p-4 text-left transition hover:bg-[#151515]"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 items-start gap-3">
@@ -483,7 +497,7 @@ export default function TransactionsPage() {
                           </div>
 
                           {Number(item.is_read || 0) !== 1 ? (
-                            <span className="rounded-full bg-lime-400 px-2 py-0.5 text-[10px] font-semibold text-black">
+                            <span className="rounded-full bg-cyan-500 px-2 py-0.5 text-[10px] font-semibold text-black">
                               New
                             </span>
                           ) : null}
@@ -526,7 +540,7 @@ export default function TransactionsPage() {
             return (
               <div
                 key={item.id}
-                className="rounded-[22px] border border-white/10 bg-[#0f0f0f] p-4"
+                className="rounded-[22px] border border-white/10 bg-[#0a0e1a] p-4"
               >
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-3">
