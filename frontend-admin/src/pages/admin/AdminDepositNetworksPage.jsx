@@ -190,6 +190,37 @@ export default function AdminDepositNetworksPage() {
     }
   }
 
+  // ========== ADDED: Auto-generate QR code from wallet address ==========
+  async function autoGenerateQrFromAddress() {
+    const address = String(form.address || "").trim();
+    if (!address) {
+      setError("Please enter wallet address first to generate QR code.");
+      return false;
+    }
+
+    try {
+      setError("");
+      setSuccess("");
+      
+      const response = await adminApi.generateWalletQr({ text: address }, token);
+      
+      if (response.data?.success && response.data?.data?.qr_base64) {
+        setForm((prev) => ({
+          ...prev,
+          qr_image_url: response.data.data.qr_base64,
+        }));
+        setSuccess("QR code generated successfully from wallet address!");
+        return true;
+      } else {
+        setError(response.data?.message || "Failed to generate QR code from address");
+        return false;
+      }
+    } catch (err) {
+      setError("Failed to generate QR code: " + (err.message || "Unknown error"));
+      return false;
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
 
@@ -213,6 +244,18 @@ export default function AdminDepositNetworksPage() {
       setError("");
       setSuccess("");
 
+      let qrImageUrl = String(form.qr_image_url || "").trim();
+      
+      // ========== ADDED: Auto-generate QR code if no QR image provided ==========
+      if (!qrImageUrl && form.address) {
+        const response = await adminApi.generateWalletQr({ text: form.address.trim() }, token);
+        
+        if (response.data?.success && response.data?.data?.qr_base64) {
+          qrImageUrl = response.data.data.qr_base64;
+          setSuccess("QR code auto-generated from wallet address.");
+        }
+      }
+
       const payload = {
         coin: String(form.coin || "").trim().toUpperCase(),
         network: String(form.network || "").trim().toUpperCase(),
@@ -220,7 +263,7 @@ export default function AdminDepositNetworksPage() {
         address: String(form.address || "").trim(),
         minimum_deposit: Number(form.minimum_deposit || 0),
         sort_order: Number(form.sort_order || 0),
-        qr_image_url: String(form.qr_image_url || "").trim(),
+        qr_image_url: qrImageUrl,
         status: String(form.status || "active").trim().toLowerCase(),
       };
 
@@ -494,6 +537,21 @@ export default function AdminDepositNetworksPage() {
               />
             </div>
 
+            {/* ========== ADDED: Auto-Generate QR Code Button ========== */}
+            <div>
+              <button
+                type="button"
+                onClick={autoGenerateQrFromAddress}
+                className="inline-flex items-center gap-2 rounded-2xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-300 transition hover:bg-cyan-500/20"
+              >
+                <QrCode size={16} />
+                Generate QR Code from Address
+              </button>
+              <p className="mt-1 text-xs text-slate-500">
+                Click to auto-generate QR code from the wallet address above.
+              </p>
+            </div>
+
             <div className="grid gap-3 md:grid-cols-2">
               <div>
                 <label className="mb-2 block text-sm text-slate-300">Minimum Deposit</label>
@@ -527,7 +585,7 @@ export default function AdminDepositNetworksPage() {
             <div className="space-y-3 rounded-2xl border border-white/10 bg-slate-900/50 p-4">
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-300">
-                  Upload QR Image
+                  Upload QR Image (Optional - Auto-generate available)
                 </label>
                 <input
                   type="file"
@@ -542,12 +600,12 @@ export default function AdminDepositNetworksPage() {
               ) : null}
 
               <div>
-                <label className="mb-2 block text-sm text-slate-300">QR Image URL</label>
+                <label className="mb-2 block text-sm text-slate-300">QR Image URL / Base64</label>
                 <input
                   name="qr_image_url"
                   value={form.qr_image_url}
                   onChange={handleChange}
-                  placeholder="QR Image URL"
+                  placeholder="QR Image URL or auto-generated base64"
                   className="w-full rounded-2xl border border-white/10 bg-slate-800 px-4 py-3 text-sm text-white outline-none focus:border-violet-500"
                 />
               </div>
@@ -560,7 +618,7 @@ export default function AdminDepositNetworksPage() {
                   </div>
                   <div className="flex justify-center sm:justify-start">
                     <ImagePreview
-                      src={resolveImageUrl(form.qr_image_url)}
+                      src={form.qr_image_url.startsWith('data:image') ? form.qr_image_url : resolveImageUrl(form.qr_image_url)}
                       alt="QR preview"
                     />
                   </div>
@@ -776,7 +834,7 @@ export default function AdminDepositNetworksPage() {
                         <div className="mb-3 text-sm text-slate-400">QR Image</div>
                         <div className="flex justify-center sm:justify-start">
                           <ImagePreview
-                            src={resolveImageUrl(item.qr_image_url)}
+                            src={item.qr_image_url.startsWith('data:image') ? item.qr_image_url : resolveImageUrl(item.qr_image_url)}
                             alt={`${item.display_label || item.coin} QR`}
                           />
                         </div>
