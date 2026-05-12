@@ -190,7 +190,7 @@ export default function AdminDepositNetworksPage() {
     }
   }
 
-  // ========== ADDED: Auto-generate QR code from wallet address ==========
+  // Auto-generate QR code from wallet address
   async function autoGenerateQrFromAddress() {
     const address = String(form.address || "").trim();
     if (!address) {
@@ -246,7 +246,7 @@ export default function AdminDepositNetworksPage() {
 
       let qrImageUrl = String(form.qr_image_url || "").trim();
       
-      // ========== ADDED: Auto-generate QR code if no QR image provided ==========
+      // Auto-generate QR code if no QR image provided
       if (!qrImageUrl && form.address) {
         const response = await adminApi.generateWalletQr({ text: form.address.trim() }, token);
         
@@ -537,7 +537,7 @@ export default function AdminDepositNetworksPage() {
               />
             </div>
 
-            {/* ========== ADDED: Auto-Generate QR Code Button ========== */}
+            {/* Auto-Generate QR Code Button */}
             <div>
               <button
                 type="button"
