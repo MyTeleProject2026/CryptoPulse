@@ -28,9 +28,12 @@ function formatTime(date) {
   return parsed.toLocaleString();
 }
 
+// Function to resolve asset URLs (handles base64 and http URLs)
 function resolveAssetUrl(url) {
   if (!url) return "";
-  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  // If it's already a base64 data URL, return as is
+  if (url && url.startsWith('data:image/')) return url;
+  if (url && (url.startsWith("http://") || url.startsWith("https://"))) return url;
   return `${API_BASE}${url}`;
 }
 
@@ -51,7 +54,7 @@ function getStatusClass(status) {
 function GlassCard({ children, className = "" }) {
   return (
     <section
-      className={`rounded-[30px] border border-white/10 bg-[#0f0f0f] shadow-[0_18px_60px_rgba(0,0,0,0.35)] ${className}`}
+      className={`rounded-[30px] border border-white/10 bg-[#0a0e1a] shadow-[0_18px_60px_rgba(0,0,0,0.35)] ${className}`}
     >
       {children}
     </section>
@@ -71,8 +74,8 @@ function ActionButton({
   className = "",
 }) {
   const styles = {
-    primary: "bg-lime-400 text-black hover:bg-lime-300",
-    secondary: "border border-white/10 bg-[#171717] text-white hover:bg-[#1e1e1e]",
+    primary: "bg-lime-500 text-black hover:bg-lime-400",
+    secondary: "border border-white/10 bg-[#0a0e1a] text-white hover:bg-[#1e1e1e]",
     ghost: "border border-white/10 bg-transparent text-white hover:bg-white/5",
   };
 
@@ -134,7 +137,14 @@ export default function DepositPage() {
         depositApi.history(token),
       ]);
 
-      const walletRows = Array.isArray(walletRes.data?.data) ? walletRes.data.data : [];
+      let walletRows = Array.isArray(walletRes.data?.data) ? walletRes.data.data : [];
+      
+      // Normalize wallet data to ensure qr_image_url is properly set
+      walletRows = walletRows.map(wallet => ({
+        ...wallet,
+        qr_image_url: wallet.qr_image_url || wallet.qr_url || null,
+      }));
+      
       const historyRows = Array.isArray(historyRes.data?.data) ? historyRes.data.data : [];
 
       setWallets(walletRows);
@@ -173,6 +183,12 @@ export default function DepositPage() {
       null
     );
   }, [wallets, selectedWalletId]);
+
+  // Get the QR code URL from selected wallet (handles multiple field names)
+  const qrCodeUrl = useMemo(() => {
+    if (!selectedWallet) return null;
+    return selectedWallet.qr_image_url || selectedWallet.qr_url || null;
+  }, [selectedWallet]);
 
   async function handleCopyAddress() {
     if (!selectedWallet?.address) return;
@@ -226,7 +242,7 @@ export default function DepositPage() {
       return;
     }
 
-    const minDeposit = Number(selectedWallet.min_deposit || 0);
+    const minDeposit = Number(selectedWallet.minimum_deposit || 0);
     if (minDeposit > 0 && Number(form.amount) < minDeposit) {
       showError(`Minimum deposit is ${formatAmount(minDeposit)}.`);
       return;
@@ -295,7 +311,7 @@ export default function DepositPage() {
       <section className="rounded-[34px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(163,230,53,0.10),transparent_18%),linear-gradient(180deg,#0a0a0a_0%,#050505_100%)] p-5 shadow-[0_20px_80px_rgba(0,0,0,0.45)]">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <div className="text-xs uppercase tracking-[0.32em] text-lime-300">
+            <div className="text-xs uppercase tracking-[0.32em] text-lime-400">
               Deposit
             </div>
             <h1 className="mt-2 text-3xl font-bold text-white">Add Funds</h1>
@@ -318,7 +334,7 @@ export default function DepositPage() {
         <GlassCard>
           <div className="border-b border-white/10 px-5 py-4">
             <div className="flex items-center gap-3">
-              <Wallet size={18} className="text-lime-300" />
+              <Wallet size={18} className="text-lime-400" />
               <h2 className="text-xl font-semibold text-white">Deposit Wallet</h2>
             </div>
           </div>
@@ -329,7 +345,7 @@ export default function DepositPage() {
               <select
                 value={selectedWalletId}
                 onChange={(e) => setSelectedWalletId(e.target.value)}
-                className="w-full rounded-2xl border border-white/10 bg-[#171717] px-4 py-3 text-white outline-none focus:border-lime-400"
+                className="w-full rounded-2xl border border-white/10 bg-[#0a0e1a] px-4 py-3 text-white outline-none focus:border-lime-500"
               >
                 {wallets.map((wallet) => {
                   const value = String(wallet.id || `${wallet.coin}-${wallet.network}`);
@@ -348,7 +364,7 @@ export default function DepositPage() {
             </div>
 
             {selectedWallet ? (
-              <div className="rounded-[28px] border border-white/10 bg-black p-5">
+              <div className="rounded-[28px] border border-white/10 bg-[#050812] p-5">
                 <div className="grid gap-6 lg:grid-cols-[1fr_auto]">
                   <div className="min-w-0">
                     <div className="text-2xl font-semibold text-white">
@@ -358,14 +374,14 @@ export default function DepositPage() {
                     </div>
 
                     <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-2xl border border-white/10 bg-[#141414] p-4">
+                      <div className="rounded-2xl border border-white/10 bg-[#0a0e1a] p-4">
                         <div className="text-sm text-slate-500">Coin</div>
                         <div className="mt-2 text-lg font-semibold text-white">
                           {selectedWallet.coin || "--"}
                         </div>
                       </div>
 
-                      <div className="rounded-2xl border border-white/10 bg-[#141414] p-4">
+                      <div className="rounded-2xl border border-white/10 bg-[#0a0e1a] p-4">
                         <div className="text-sm text-slate-500">Network</div>
                         <div className="mt-2 text-lg font-semibold text-white">
                           {selectedWallet.network || "--"}
@@ -375,7 +391,7 @@ export default function DepositPage() {
 
                     <div className="mt-4">
                       <div className="text-sm text-slate-500">Deposit Address</div>
-                      <div className="mt-2 break-all rounded-2xl border border-white/10 bg-[#141414] px-4 py-4 text-sm text-white">
+                      <div className="mt-2 break-all rounded-2xl border border-white/10 bg-[#0a0e1a] px-4 py-4 text-sm text-white">
                         {selectedWallet.address || "--"}
                       </div>
 
@@ -389,15 +405,15 @@ export default function DepositPage() {
                       </div>
                     </div>
 
-                    <div className="mt-4 rounded-2xl border border-white/10 bg-[#141414] p-4">
+                    <div className="mt-4 rounded-2xl border border-white/10 bg-[#0a0e1a] p-4">
                       <div className="text-sm text-slate-500">Minimum Deposit</div>
                       <div className="mt-2 text-xl font-semibold text-amber-300">
-                        {formatAmount(selectedWallet.min_deposit || 0)}
+                        {formatAmount(selectedWallet.minimum_deposit || 0)}
                       </div>
                     </div>
 
                     {selectedWallet.instructions ? (
-                      <div className="mt-4 rounded-2xl border border-white/10 bg-[#141414] p-4">
+                      <div className="mt-4 rounded-2xl border border-white/10 bg-[#0a0e1a] p-4">
                         <div className="text-sm text-slate-500">Instructions</div>
                         <div className="mt-2 text-sm leading-6 text-slate-200">
                           {selectedWallet.instructions}
@@ -406,25 +422,50 @@ export default function DepositPage() {
                     ) : null}
                   </div>
 
-                  {selectedWallet.qr_url ? (
+                  {/* QR Code Display */}
+                  {qrCodeUrl ? (
                     <div className="mx-auto lg:mx-0">
-                      <div className="rounded-[24px] border border-white/10 bg-[#141414] p-4">
+                      <div className="rounded-[24px] border border-white/10 bg-[#0a0e1a] p-4">
                         <div className="mb-3 flex items-center gap-2 text-sm text-slate-400">
                           <QrCode size={16} />
                           QR Code
                         </div>
                         <img
-                          src={resolveAssetUrl(selectedWallet.qr_url)}
+                          src={resolveAssetUrl(qrCodeUrl)}
                           alt="Deposit QR"
                           className="h-44 w-44 rounded-2xl border border-white/10 bg-white object-contain p-2 sm:h-52 sm:w-52"
+                          onError={(e) => {
+                            console.error("QR image failed to load:", qrCodeUrl);
+                            e.target.style.display = 'none';
+                            const parent = e.target.parentElement;
+                            if (parent && !parent.querySelector('.qr-fallback')) {
+                              const fallback = document.createElement('div');
+                              fallback.className = 'qr-fallback text-center p-4';
+                              fallback.innerHTML = '<p class="text-red-400 text-sm">QR Code unavailable</p><p class="text-slate-500 text-xs mt-2">Please use the wallet address above</p>';
+                              parent.appendChild(fallback);
+                            }
+                          }}
                         />
                       </div>
                     </div>
-                  ) : null}
+                  ) : (
+                    <div className="mx-auto lg:mx-0">
+                      <div className="rounded-[24px] border border-white/10 bg-[#0a0e1a] p-4">
+                        <div className="mb-3 flex items-center gap-2 text-sm text-slate-400">
+                          <QrCode size={16} />
+                          QR Code
+                        </div>
+                        <div className="flex h-44 w-44 flex-col items-center justify-center rounded-2xl border border-white/10 bg-slate-800 p-4 sm:h-52 sm:w-52">
+                          <p className="text-xs text-red-400 text-center">QR Code Not Available</p>
+                          <p className="text-[10px] text-slate-500 text-center mt-2">Use the wallet address above</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
-              <div className="rounded-2xl border border-white/10 bg-[#141414] px-4 py-8 text-center text-sm text-slate-400">
+              <div className="rounded-2xl border border-white/10 bg-[#0a0e1a] px-4 py-8 text-center text-sm text-slate-400">
                 No deposit wallet available.
               </div>
             )}
@@ -434,7 +475,7 @@ export default function DepositPage() {
         <GlassCard>
           <div className="border-b border-white/10 px-5 py-4">
             <div className="flex items-center gap-3">
-              <ArrowDownToLine size={18} className="text-lime-300" />
+              <ArrowDownToLine size={18} className="text-lime-400" />
               <h2 className="text-xl font-semibold text-white">Submit Deposit Request</h2>
             </div>
           </div>
@@ -451,7 +492,7 @@ export default function DepositPage() {
                   setForm((prev) => ({ ...prev, amount: e.target.value }))
                 }
                 placeholder="Enter deposit amount"
-                className="w-full rounded-2xl border border-white/10 bg-[#171717] px-4 py-3 text-white outline-none focus:border-lime-400"
+                className="w-full rounded-2xl border border-white/10 bg-[#0a0e1a] px-4 py-3 text-white outline-none focus:border-lime-500"
               />
             </div>
 
@@ -464,7 +505,7 @@ export default function DepositPage() {
                   setForm((prev) => ({ ...prev, txid: e.target.value }))
                 }
                 placeholder="Paste transaction hash"
-                className="w-full rounded-2xl border border-white/10 bg-[#171717] px-4 py-3 text-white outline-none focus:border-lime-400"
+                className="w-full rounded-2xl border border-white/10 bg-[#0a0e1a] px-4 py-3 text-white outline-none focus:border-lime-500"
               />
             </div>
 
@@ -477,11 +518,11 @@ export default function DepositPage() {
                   setForm((prev) => ({ ...prev, note: e.target.value }))
                 }
                 placeholder="Add any note for this deposit"
-                className="w-full rounded-2xl border border-white/10 bg-[#171717] px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-lime-400"
+                className="w-full rounded-2xl border border-white/10 bg-[#0a0e1a] px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-lime-500"
               />
             </div>
 
-            <div className="rounded-[24px] border border-white/10 bg-black p-4">
+            <div className="rounded-[24px] border border-white/10 bg-[#050812] p-4">
               <div className="mb-3 flex items-center gap-2 text-sm text-slate-400">
                 <Upload size={16} />
                 Upload Receipt
@@ -491,15 +532,15 @@ export default function DepositPage() {
                 type="file"
                 accept="image/*"
                 onChange={handleReceiptUpload}
-                className="block w-full text-sm text-slate-300 file:mr-4 file:rounded-xl file:border-0 file:bg-lime-400 file:px-4 file:py-2 file:font-semibold file:text-black hover:file:bg-lime-300"
+                className="block w-full text-sm text-slate-300 file:mr-4 file:rounded-xl file:border-0 file:bg-lime-500 file:px-4 file:py-2 file:font-semibold file:text-black hover:file:bg-lime-400"
               />
 
               {uploadingReceipt ? (
-                <div className="mt-3 text-sm text-cyan-300">Uploading receipt...</div>
+                <div className="mt-3 text-sm text-lime-300">Uploading receipt...</div>
               ) : null}
 
               {form.proof ? (
-                <div className="mt-4 rounded-2xl border border-white/10 bg-[#141414] p-4">
+                <div className="mt-4 rounded-2xl border border-white/10 bg-[#0a0e1a] p-4">
                   <div className="mb-3 flex items-center gap-2 text-sm text-slate-400">
                     <ImageIcon size={16} />
                     Receipt Preview
@@ -508,6 +549,9 @@ export default function DepositPage() {
                     src={resolveAssetUrl(form.proof)}
                     alt="Receipt preview"
                     className="max-h-72 w-full rounded-2xl border border-white/10 object-cover"
+                    onError={(e) => {
+                      e.target.src = 'https://placehold.co/400x200?text=Image+not+found';
+                    }}
                   />
                 </div>
               ) : null}
@@ -528,7 +572,7 @@ export default function DepositPage() {
         <div className="border-b border-white/10 px-5 py-4">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-xl font-semibold text-white">Deposit History</h2>
-            <span className="rounded-full border border-white/10 bg-black px-3 py-1 text-xs text-slate-300">
+            <span className="rounded-full border border-white/10 bg-[#050812] px-3 py-1 text-xs text-slate-300">
               {history.length} Record{history.length === 1 ? "" : "s"}
             </span>
           </div>
@@ -539,7 +583,7 @@ export default function DepositPage() {
             history.map((item) => (
               <div
                 key={item.id}
-                className="rounded-[26px] border border-white/10 bg-black p-5"
+                className="rounded-[26px] border border-white/10 bg-[#050812] p-5"
               >
                 <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
                   <div>
@@ -556,7 +600,7 @@ export default function DepositPage() {
                     </div>
 
                     <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                      <div className="rounded-2xl border border-white/10 bg-[#141414] p-4">
+                      <div className="rounded-2xl border border-white/10 bg-[#0a0e1a] p-4">
                         <div className="text-xs uppercase tracking-wide text-slate-500">
                           Coin
                         </div>
@@ -565,7 +609,7 @@ export default function DepositPage() {
                         </div>
                       </div>
 
-                      <div className="rounded-2xl border border-white/10 bg-[#141414] p-4">
+                      <div className="rounded-2xl border border-white/10 bg-[#0a0e1a] p-4">
                         <div className="text-xs uppercase tracking-wide text-slate-500">
                           Network
                         </div>
@@ -574,16 +618,16 @@ export default function DepositPage() {
                         </div>
                       </div>
 
-                      <div className="rounded-2xl border border-white/10 bg-[#141414] p-4">
+                      <div className="rounded-2xl border border-white/10 bg-[#0a0e1a] p-4">
                         <div className="text-xs uppercase tracking-wide text-slate-500">
                           Amount
                         </div>
-                        <div className="mt-2 text-sm font-semibold text-lime-300">
+                        <div className="mt-2 text-sm font-semibold text-lime-400">
                           {formatAmount(item.amount)}
                         </div>
                       </div>
 
-                      <div className="rounded-2xl border border-white/10 bg-[#141414] p-4">
+                      <div className="rounded-2xl border border-white/10 bg-[#0a0e1a] p-4">
                         <div className="text-xs uppercase tracking-wide text-slate-500">
                           Time
                         </div>
@@ -596,7 +640,7 @@ export default function DepositPage() {
 
                   <div className="space-y-4">
                     {item.txid ? (
-                      <div className="rounded-2xl border border-white/10 bg-[#141414] p-4">
+                      <div className="rounded-2xl border border-white/10 bg-[#0a0e1a] p-4">
                         <div className="text-xs uppercase tracking-wide text-slate-500">
                           TXID
                         </div>
@@ -607,7 +651,7 @@ export default function DepositPage() {
                     ) : null}
 
                     {item.proof || item.receipt_url ? (
-                      <div className="rounded-2xl border border-white/10 bg-[#141414] p-4">
+                      <div className="rounded-2xl border border-white/10 bg-[#0a0e1a] p-4">
                         <div className="mb-3 text-xs uppercase tracking-wide text-slate-500">
                           Receipt
                         </div>
@@ -615,16 +659,19 @@ export default function DepositPage() {
                           src={resolveAssetUrl(item.proof || item.receipt_url)}
                           alt="Deposit proof"
                           className="max-h-56 w-full rounded-2xl border border-white/10 object-cover"
+                          onError={(e) => {
+                            e.target.src = 'https://placehold.co/400x200?text=Image+not+found';
+                          }}
                         />
                       </div>
                     ) : (
-                      <div className="rounded-2xl border border-white/10 bg-[#141414] px-4 py-6 text-center text-sm text-slate-500">
+                      <div className="rounded-2xl border border-white/10 bg-[#0a0e1a] px-4 py-6 text-center text-sm text-slate-500">
                         No receipt uploaded.
                       </div>
                     )}
 
                     {item.note ? (
-                      <div className="rounded-2xl border border-white/10 bg-[#141414] p-4">
+                      <div className="rounded-2xl border border-white/10 bg-[#0a0e1a] p-4">
                         <div className="text-xs uppercase tracking-wide text-slate-500">
                           Note
                         </div>
@@ -638,7 +685,7 @@ export default function DepositPage() {
               </div>
             ))
           ) : (
-            <div className="rounded-2xl border border-white/10 bg-[#141414] px-4 py-10 text-center text-sm text-slate-400">
+            <div className="rounded-2xl border border-white/10 bg-[#0a0e1a] px-4 py-10 text-center text-sm text-slate-400">
               No deposit history found.
             </div>
           )}
