@@ -56,13 +56,13 @@ function getVoucherIcon(type) {
 function getVoucherColor(type) {
   switch (type) {
     case "convert":
-      return "from-cyan-500/20 to-cyan-600/10 border-cyan-400/30";
+      return "from-lime-500/20 to-lime-600/10 border-lime-400/30";
     case "deposit":
       return "from-emerald-500/20 to-emerald-600/10 border-emerald-400/30";
     case "withdraw":
       return "from-amber-500/20 to-amber-600/10 border-amber-400/30";
     case "trade":
-      return "from-cyan-500/20 to-lime-600/10 border-cyan-500/30";
+      return "from-lime-500/20 to-lime-600/10 border-lime-500/30";
     case "loan":
       return "from-violet-500/20 to-violet-600/10 border-violet-400/30";
     case "joint_account":
@@ -95,21 +95,17 @@ export default function VoucherModal({ voucher, onClose }) {
   const Icon = getVoucherIcon(voucher?.type);
   const colorClass = getVoucherColor(voucher?.type);
 
-  // ========== ADDED: Reset animation when voucher changes (for multiple transactions) ==========
+  // Reset animation when voucher changes (for multiple transactions)
   useEffect(() => {
-    // Reset states when a new voucher comes in
     setIsVisible(false);
     setIsClosing(false);
-    
-    // Small delay then show the new voucher
     const timer = setTimeout(() => {
       setIsVisible(true);
     }, 10);
-    
     return () => clearTimeout(timer);
-  }, [voucher?.transactionId]); // Re-run when transaction ID changes (new voucher)
+  }, [voucher?.transactionId]);
 
-  // ========== ADDED: Cleanup function for when component unmounts ==========
+  // Cleanup function for when component unmounts
   useEffect(() => {
     return () => {
       document.body.style.overflow = '';
@@ -120,45 +116,39 @@ export default function VoucherModal({ voucher, onClose }) {
   // Handle escape key press
   useEffect(() => {
     const handleEsc = (e) => {
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' && isVisible && !isClosing) {
         handleClose();
       }
     };
     window.addEventListener('keydown', handleEsc);
     return () => window.removeEventListener('keydown', handleEsc);
-  }, []);
+  }, [isVisible, isClosing]);
 
-  // Animate in on mount
+  // Prevent body scroll when modal is open
   useEffect(() => {
-    requestAnimationFrame(() => {
-      setIsVisible(true);
-    });
-    // Prevent body scroll
-    document.body.style.overflow = 'hidden';
-    
+    if (isVisible) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
     return () => {
       document.body.style.overflow = '';
     };
-  }, []);
+  }, [isVisible]);
 
   const handleClose = () => {
-    if (isClosing) return; // Prevent multiple close attempts
+    if (isClosing) return;
     
     setIsClosing(true);
     setIsVisible(false);
     
-    // Wait for animation to complete before calling onClose
     setTimeout(() => {
-      // SAFE CLEANUP: Only try to remove if the element exists and is a child
-      if (modalContainerRef.current && modalContainerRef.current.parentNode) {
-        // Don't manually remove - let React handle it
-      }
       onClose();
     }, 300);
   };
 
   const handleBackdropClick = (e) => {
-    if (e.target === e.currentTarget) {
+    if (e.target === e.currentTarget && !isClosing) {
       handleClose();
     }
   };
@@ -169,7 +159,7 @@ export default function VoucherModal({ voucher, onClose }) {
       setCapturing(true);
       const canvas = await html2canvas(voucherRef.current, {
         scale: 2,
-        backgroundColor: "#0b1630",
+        backgroundColor: "#0a0a0a",
         logging: false,
       });
       const link = document.createElement("a");
@@ -212,7 +202,7 @@ export default function VoucherModal({ voucher, onClose }) {
             <VoucherRow
               label="Net Received"
               value={`${formatAmount(voucher.data?.netUsdtValue)} USDT`}
-              valueClassName="text-cyan-300"
+              valueClassName="text-lime-300"
             />
           </>
         );
@@ -281,7 +271,7 @@ export default function VoucherModal({ voucher, onClose }) {
             <VoucherRow
               label="Payout %"
               value={`${voucher.data?.payoutPercent}%`}
-              valueClassName="text-cyan-400"
+              valueClassName="text-lime-400"
             />
             <VoucherRow
               label="Est. Profit"
@@ -304,7 +294,7 @@ export default function VoucherModal({ voucher, onClose }) {
             <VoucherRow
               label="Daily Profit Rate"
               value={`${voucher.data?.selected_daily_profit_percent}%`}
-              valueClassName="text-cyan-300"
+              valueClassName="text-lime-300"
             />
             <VoucherRow label="Duration" value={`${voucher.data?.total_days} days`} />
             <VoucherRow label="Start Date" value={formatDateTime(voucher.data?.started_at)} />
@@ -334,7 +324,7 @@ export default function VoucherModal({ voucher, onClose }) {
             <VoucherRow
               label="Total Repayment"
               value={`${formatAmount(voucher.data?.totalRepayment)} USDT`}
-              valueClassName="text-cyan-400"
+              valueClassName="text-lime-400"
             />
             <VoucherRow label="Status" value={voucher.data?.status || "Pending"} />
           </>
@@ -391,9 +381,9 @@ export default function VoucherModal({ voucher, onClose }) {
     <div
       ref={modalContainerRef}
       className={`
-        fixed inset-0 z-[250] flex items-end justify-center bg-[#050812]/80 p-0
+        fixed inset-0 z-[250] flex items-end justify-center bg-black/80 p-0
         transition-all duration-300 sm:items-center sm:p-4
-        ${isVisible ? "bg-[#050812]/80 opacity-100" : "bg-[#050812]/0 opacity-0 pointer-events-none"}
+        ${isVisible ? "bg-black/80 opacity-100" : "bg-black/0 opacity-0 pointer-events-none"}
       `}
       onClick={handleBackdropClick}
     >
@@ -406,12 +396,12 @@ export default function VoucherModal({ voucher, onClose }) {
           ${isVisible ? "translate-y-0 opacity-100" : "translate-y-full opacity-0 sm:translate-y-0 sm:scale-95"}
         `}
         onClick={(e) => e.stopPropagation()}
-        style={{ background: "#0b1630" }}
+        style={{ background: "#0a0a0a" }}
       >
         <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10">
-              <Icon size={20} className="text-cyan-400" />
+              <Icon size={20} className="text-lime-400" />
             </div>
             <div>
               <div className="text-[22px] font-bold text-white">
@@ -438,7 +428,7 @@ export default function VoucherModal({ voucher, onClose }) {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-[#050812]/30 p-4">
+          <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
             <div className="space-y-3">{renderVoucherContent()}</div>
           </div>
 
@@ -464,7 +454,7 @@ export default function VoucherModal({ voucher, onClose }) {
               type="button"
               onClick={handleScreenshot}
               disabled={capturing}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-cyan-500 px-4 py-3 text-sm font-semibold text-black transition hover:bg-cyan-400 disabled:opacity-60"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-lime-500 px-4 py-3 text-sm font-semibold text-black transition hover:bg-lime-400 disabled:opacity-60"
             >
               {capturing ? (
                 <>
