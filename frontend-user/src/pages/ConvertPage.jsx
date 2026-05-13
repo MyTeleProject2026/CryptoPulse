@@ -22,7 +22,7 @@ const COINS = [
   {
     symbol: "USDT",
     label: "Tether USD",
-    color: "from-cyan-500/20 to-cyan-400/5",
+    color: "from-lime-400/20 to-lime-500/10",
   },
   {
     symbol: "BTC",
@@ -132,15 +132,6 @@ function SummaryStat({ label, value, subtext, icon: Icon, tone = "text-white" })
   );
 }
 
-function VoucherRow({ label, value, valueClassName = "text-white" }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <div className="text-sm text-slate-400">{label}</div>
-      <div className={`text-right text-sm font-semibold ${valueClassName}`}>{value}</div>
-    </div>
-  );
-}
-
 export default function ConvertPage() {
   const token =
     localStorage.getItem("userToken") ||
@@ -155,6 +146,9 @@ export default function ConvertPage() {
     user: null,
     walletLabel: "Main Wallet",
   });
+
+  // ✅ FIX: Add portfolio assets state for non-USDT balances
+  const [portfolioAssets, setPortfolioAssets] = useState([]);
 
   const [platformSettings, setPlatformSettings] = useState({
     wallet_label: "Main Wallet",
@@ -174,7 +168,23 @@ export default function ConvertPage() {
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [convertVoucher, setConvertVoucher] = useState(null);
+
+  // ✅ FIX: Load user's portfolio assets to get balances for all coins
+  async function loadPortfolioAssets() {
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://cryptopulse-4rhe.onrender.com";
+      const res = await fetch(`${API_BASE_URL}/api/user/assets`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      
+      if (data.success && Array.isArray(data.data?.assets)) {
+        setPortfolioAssets(data.data.assets);
+      }
+    } catch (err) {
+      console.error("Failed to load portfolio assets:", err);
+    }
+  }
 
   async function loadData(silent = false) {
     try {
@@ -215,6 +225,9 @@ export default function ConvertPage() {
         });
       }
 
+      // ✅ FIX: Load portfolio assets for non-USDT balances
+      await loadPortfolioAssets();
+
       setError("");
     } catch (err) {
       setError(getApiErrorMessage(err));
@@ -227,9 +240,10 @@ export default function ConvertPage() {
   useEffect(() => {
     loadData();
 
+    // ✅ FIX: Changed refresh rate from 10s to 30s
     const interval = setInterval(() => {
       loadData(true);
-    }, 10000);
+    }, 30000);
 
     return () => clearInterval(interval);
   }, []);
@@ -248,6 +262,15 @@ export default function ConvertPage() {
     const num = Number(platformSettings.default_convert_fee_percent || 0.2);
     return Number.isFinite(num) ? num : 0.2;
   }, [platformSettings.default_convert_fee_percent]);
+
+  // ✅ FIX: Get balance for selected coin (USDT from wallet, others from portfolioAssets)
+  const getCoinBalance = (coinSymbol) => {
+    if (coinSymbol === "USDT") {
+      return Number(wallet.balance || 0);
+    }
+    const asset = portfolioAssets.find(a => a.symbol === coinSymbol);
+    return Number(asset?.amount || 0);
+  };
 
   const preview = useMemo(() => {
     const amount = Number(form.fromAmount || 0);
@@ -301,22 +324,35 @@ export default function ConvertPage() {
     setError("");
   }
 
+  // ✅ FIX: Use Max button works for ALL coins now
   function handleUseMax() {
-    if (form.fromCoin !== "USDT") {
-      showError("Max balance is only available when converting from USDT.");
+    const currentBalance = getCoinBalance(form.fromCoin);
+    
+    if (currentBalance <= 0) {
+      showError(`No ${form.fromCoin} balance available.`);
       setSuccess("");
       return;
     }
 
+    // Format the amount without losing precision
+    let maxAmount = currentBalance;
+    if (form.fromCoin === "USDT") {
+      maxAmount = formatMoney(currentBalance);
+    } else {
+      maxAmount = currentBalance.toFixed(8);
+    }
+
     setForm((prev) => ({
       ...prev,
-      fromAmount: formatMoney(wallet.balance),
+      fromAmount: maxAmount,
     }));
 
     setError("");
     setSuccess("");
+    showSuccess(`Max ${form.fromCoin} balance: ${maxAmount}`);
   }
 
+  // ✅ FIX: Validate form with proper balance check for ALL coins
   function validateConvertForm() {
     const amount = Number(form.fromAmount || 0);
 
@@ -332,8 +368,10 @@ export default function ConvertPage() {
       return "Market price is not available for this conversion pair right now.";
     }
 
-    if (form.fromCoin === "USDT" && amount > Number(wallet.balance || 0)) {
-      return "Insufficient available USDT balance.";
+    // ✅ FIX: Check balance for ANY coin, not just USDT
+    const currentBalance = getCoinBalance(form.fromCoin);
+    if (amount > currentBalance) {
+      return `Insufficient ${form.fromCoin} balance. Available: ${currentBalance.toFixed(8)} ${form.fromCoin}`;
     }
 
     return "";
@@ -432,6 +470,7 @@ export default function ConvertPage() {
 
   const fromMeta = getCoinMeta(form.fromCoin);
   const toMeta = getCoinMeta(form.toCoin);
+  const currentBalance = getCoinBalance(form.fromCoin);
 
   if (loading) {
     return (
@@ -463,13 +502,13 @@ export default function ConvertPage() {
             <span
               className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${
                 refreshing
-                  ? "border-cyan-500/20 bg-cyan-500/10 text-cyan-300"
+                  ? "border-lime-400/20 bg-lime-400/10 text-lime-300"
                   : "border-emerald-500/20 bg-emerald-500/10 text-emerald-300"
               }`}
             >
               <span
                 className={`mr-2 inline-block h-2.5 w-2.5 rounded-full ${
-                  refreshing ? "animate-pulse bg-cyan-400" : "bg-emerald-400"
+                  refreshing ? "animate-pulse bg-lime-400" : "bg-emerald-400"
                 }`}
               />
               {refreshing ? "Refreshing..." : "Rate Ready"}
@@ -493,8 +532,8 @@ export default function ConvertPage() {
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <SummaryStat
           label={platformSettings.wallet_label || "Available Balance"}
-          value={`${formatMoney(wallet.balance)} USDT`}
-          subtext={`UID: ${wallet.user?.uid || "--"}`}
+          value={`${formatMoney(currentBalance)} ${form.fromCoin}`}
+          subtext={`Available ${form.fromCoin} balance`}
           icon={Wallet}
         />
 
@@ -592,7 +631,7 @@ export default function ConvertPage() {
                   onClick={handleUseMax}
                   className="rounded-xl border border-lime-400/20 bg-lime-400/10 px-3 py-2 text-xs font-semibold text-lime-300 transition hover:bg-lime-400/20"
                 >
-                  Use Max
+                  Use Max ({formatAmount(currentBalance, 8)})
                 </button>
               </div>
             </div>
