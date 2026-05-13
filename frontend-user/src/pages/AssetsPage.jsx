@@ -26,6 +26,16 @@ import {
 } from "../services/api";
 import { useNotification } from "../hooks/useNotification";
 
+// ✅ FIX: Coin logos with proper icons and colors
+const COIN_LOGOS = {
+  USDT: { icon: "₮", color: "#26A17B", name: "Tether" },
+  BTC: { icon: "₿", color: "#F7931A", name: "Bitcoin" },
+  ETH: { icon: "Ξ", color: "#627EEA", name: "Ethereum" },
+  BNB: { icon: "ⓑ", color: "#F3BA2F", name: "BNB" },
+  SOL: { icon: "◎", color: "#00FFBD", name: "Solana" },
+  XRP: { icon: "✕", color: "#23292F", name: "XRP" },
+};
+
 function formatMoney(value) {
   const num = Number(value || 0);
   if (!Number.isFinite(num)) return "0.00";
@@ -65,100 +75,42 @@ function getCoinAccent(symbol) {
     BNB: "from-yellow-400/30 to-yellow-500/10",
     XRP: "from-sky-400/30 to-sky-500/10",
   };
-
-  return (
-    map[String(symbol || "").toUpperCase()] || "from-slate-400/20 to-slate-500/10"
-  );
+  return map[String(symbol || "").toUpperCase()] || "from-slate-400/20 to-slate-500/10";
 }
 
-function buildFallbackAssets(balance, markets) {
-  const total = Number(balance || 0);
-
-  const config = [
-    { symbol: "USDT", percent: 62 },
-    { symbol: "BTC", percent: 14 },
-    { symbol: "ETH", percent: 10 },
-    { symbol: "SOL", percent: 6 },
-    { symbol: "BNB", percent: 5 },
-    { symbol: "XRP", percent: 3 },
-  ];
-
-  return config.map((item) => {
-    const usdtValue = (total * item.percent) / 100;
-    const unitPrice = getCoinPriceInUsdt(item.symbol, markets);
-    const amount = unitPrice > 0 ? usdtValue / unitPrice : usdtValue;
-
-    return {
-      symbol: item.symbol,
-      amount,
-      usdtValue,
-      unitPrice,
-      avgPrice: unitPrice,
-      spotPnl: 0,
-      spotPnlPercent: 0,
-      accent: getCoinAccent(item.symbol),
-      apr: item.symbol === "USDT" ? "Up to 50% APR" : "",
-    };
-  });
-}
-
+// ✅ FIX: Normalize holdings with logos
 function normalizeHoldings(rawRows = [], markets = []) {
   return rawRows
     .map((row) => {
       const symbol = String(
-        row?.symbol ||
-          row?.coin ||
-          row?.asset ||
-          row?.currency ||
-          ""
+        row?.symbol || row?.coin || row?.asset || row?.currency || ""
       ).toUpperCase();
 
       if (!symbol) return null;
 
       const amount = Number(
-        row?.amount ??
-          row?.balance ??
-          row?.quantity ??
-          row?.free ??
-          row?.total ??
-          0
+        row?.amount ?? row?.balance ?? row?.quantity ?? row?.free ?? row?.total ?? 0
       );
 
       const currentPrice =
-        Number(
-          row?.current_price ??
-            row?.market_price ??
-            row?.price_usdt ??
-            row?.price
-        ) || getCoinPriceInUsdt(symbol, markets);
+        Number(row?.current_price ?? row?.market_price ?? row?.price_usdt ?? row?.price) ||
+        getCoinPriceInUsdt(symbol, markets);
 
       const avgPrice = Number(
-        row?.avg_price ??
-          row?.average_price ??
-          row?.buy_price ??
-          row?.entry_price ??
-          row?.cost_basis_price ??
-          currentPrice
+        row?.avg_price ?? row?.average_price ?? row?.buy_price ?? row?.entry_price ?? row?.cost_basis_price ?? currentPrice
       );
 
-      const usdtValue =
-        Number(row?.usdt_value ?? row?.value_usdt ?? row?.value) ||
-        amount * currentPrice;
+      const usdtValue = Number(row?.usdt_value ?? row?.value_usdt ?? row?.value) || amount * currentPrice;
 
-      let spotPnl = Number(
-        row?.spot_pnl ??
-          row?.profit_loss ??
-          row?.unrealized_pnl ??
-          row?.pnl
-      );
-
+      let spotPnl = Number(row?.spot_pnl ?? row?.profit_loss ?? row?.unrealized_pnl ?? row?.pnl);
       if (!Number.isFinite(spotPnl)) {
         spotPnl = (currentPrice - avgPrice) * amount;
       }
 
       const invested = avgPrice * amount;
-      const spotPnlPercent =
-        invested > 0 ? (spotPnl / invested) * 100 : 0;
+      const spotPnlPercent = invested > 0 ? (spotPnl / invested) * 100 : 0;
+
+      const logo = COIN_LOGOS[symbol] || { icon: symbol[0], color: "#6B7280", name: symbol };
 
       return {
         symbol,
@@ -170,6 +122,7 @@ function normalizeHoldings(rawRows = [], markets = []) {
         spotPnlPercent,
         accent: getCoinAccent(symbol),
         apr: symbol === "USDT" ? "Up to 50% APR" : "",
+        logo,
       };
     })
     .filter(Boolean)
@@ -201,23 +154,24 @@ function PortfolioCard({ title, value, subtext, icon: Icon, tone = "text-white" 
       <div className={`mt-2 text-2xl font-semibold tracking-tight text-white sm:text-[28px] ${tone}`}>
         {value}
       </div>
-      {subtext ? (
-        <div className="mt-1 text-xs text-slate-500">{subtext}</div>
-      ) : null}
+      {subtext ? <div className="mt-1 text-xs text-slate-500">{subtext}</div> : null}
     </div>
   );
 }
 
+// ✅ FIX: AssetRow with proper coin logos
 function AssetRow({ item }) {
   const pnlPositive = Number(item.spotPnl || 0) >= 0;
+  const logo = item.logo;
 
   return (
     <div className="flex items-center justify-between gap-3 rounded-[24px] border border-white/5 bg-white/[0.02] px-3 py-3 sm:px-4">
       <div className="flex min-w-0 items-center gap-3">
         <div
-          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${item.accent} text-xs font-bold text-white ring-1 ring-white/10 sm:h-12 sm:w-12 sm:text-sm`}
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${item.accent} text-lg font-bold text-white ring-1 ring-white/10 sm:h-12 sm:w-12`}
+          style={{ color: logo.color }}
         >
-          {item.symbol.slice(0, 3)}
+          {logo.icon}
         </div>
 
         <div className="min-w-0">
@@ -225,14 +179,13 @@ function AssetRow({ item }) {
             <div className="truncate text-base font-semibold text-white sm:text-lg">
               {item.symbol}
             </div>
-
+            <div className="text-xs text-slate-500">{logo.name}</div>
             {item.apr ? (
               <span className="rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-300 sm:text-[11px]">
                 {item.apr}
               </span>
             ) : null}
           </div>
-
           <div className="mt-0.5 text-xs text-slate-400 sm:text-sm">
             {formatAmount(item.amount, 8)}
           </div>
@@ -243,16 +196,10 @@ function AssetRow({ item }) {
         <div className="text-base font-semibold text-white sm:text-lg">
           ${item.usdtValue < 0.01 ? "<0.01" : formatMoney(item.usdtValue)}
         </div>
-        <div
-          className={`mt-0.5 text-[11px] sm:text-xs ${
-            pnlPositive ? "text-emerald-300" : "text-red-300"
-          }`}
-        >
-          {pnlPositive ? "+" : ""}
-          {formatMoney(item.spotPnl)} USDT
+        <div className={`mt-0.5 text-[11px] sm:text-xs ${pnlPositive ? "text-emerald-300" : "text-red-300"}`}>
+          {pnlPositive ? "+" : ""}{formatMoney(item.spotPnl)} USDT
           <span className="ml-1">
-            ({pnlPositive ? "+" : ""}
-            {Number(item.spotPnlPercent || 0).toFixed(2)}%)
+            ({pnlPositive ? "+" : ""}{Number(item.spotPnlPercent || 0).toFixed(2)}%)
           </span>
         </div>
       </div>
@@ -264,25 +211,20 @@ function HistoryRow({ title, date, amount, negative = false }) {
   return (
     <div className="flex items-start justify-between gap-3 border-b border-white/5 py-3 last:border-b-0">
       <div className="min-w-0">
-        <div className="truncate text-sm font-medium text-white sm:text-base">
-          {title}
-        </div>
+        <div className="truncate text-sm font-medium text-white sm:text-base">{title}</div>
         <div className="mt-1 text-xs text-slate-500 sm:text-sm">{date}</div>
       </div>
-
-      <div
-        className={`shrink-0 text-base font-semibold sm:text-lg ${
-          negative ? "text-white" : "text-emerald-300"
-        }`}
-      >
+      <div className={`shrink-0 text-base font-semibold sm:text-lg ${negative ? "text-white" : "text-emerald-300"}`}>
         {amount}
       </div>
     </div>
   );
 }
 
-// QR Transfer Modal Component
+// QR Transfer Modal Component (Keep your existing one, it already has lime green theme)
 function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
+  // ... keep your existing QR Transfer Modal code (it already has lime green theme)
+  // I'm not repeating it here to save space, but keep your existing one
   const [mode, setMode] = useState("send");
   const [scanning, setScanning] = useState(false);
   const [scannedUser, setScannedUser] = useState(null);
@@ -297,8 +239,6 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
   
   const token = localStorage.getItem("userToken") || localStorage.getItem("token") || "";
   const { showSuccess, showError, showVoucher } = useNotification();
-
-  // API Base URL - CryptoPulse backend
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://cryptopulse-4rhe.onrender.com";
 
   useEffect(() => {
@@ -331,11 +271,9 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
         setMyQrCode(data.data.qr_code_base64);
       } else {
         setQrCodeError(true);
-        console.error("QR code generation failed:", data);
       }
     } catch (err) {
       setQrCodeError(true);
-      console.error("Failed to load QR code:", err);
     }
   }
 
@@ -354,7 +292,7 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
         setScannedUser(data.data);
         showSuccess(`Found user: ${data.data.name || data.data.email}`);
       } else {
-        showError("User not found. Please check the UID.");
+        showError("User not found.");
         setScannedUser(null);
       }
     } catch (err) {
@@ -402,7 +340,6 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
       const data = await res.json();
       if (data.success) {
         showSuccess(`Successfully sent ${amount} USDT to ${scannedUser.name || scannedUser.email}`);
-        
         showVoucher({
           title: "Transfer Sent",
           type: "transfer",
@@ -415,7 +352,6 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
             created_at: new Date().toISOString(),
           },
         });
-        
         onTransferComplete?.();
         onClose();
         setScannedUser(null);
@@ -452,117 +388,32 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
       <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-5">
         <div className="mb-4 flex items-center justify-between">
           <div className="flex gap-2">
-            <button
-              onClick={() => setMode("send")}
-              className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                mode === "send" ? "bg-lime-400 text-black" : "bg-white/5 text-white"
-              }`}
-            >
-              <Send size={16} className="mr-1 inline" />
-              Send
+            <button onClick={() => setMode("send")} className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${mode === "send" ? "bg-lime-400 text-black" : "bg-white/5 text-white"}`}>
+              <Send size={16} className="mr-1 inline" /> Send
             </button>
-            <button
-              onClick={() => setMode("receive")}
-              className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                mode === "receive" ? "bg-lime-400 text-black" : "bg-white/5 text-white"
-              }`}
-            >
-              <QrCode size={16} className="mr-1 inline" />
-              Receive
+            <button onClick={() => setMode("receive")} className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${mode === "receive" ? "bg-lime-400 text-black" : "bg-white/5 text-white"}`}>
+              <QrCode size={16} className="mr-1 inline" /> Receive
             </button>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white">
-            <X size={20} />
-          </button>
+          <button onClick={onClose} className="text-slate-400 hover:text-white"><X size={20} /></button>
         </div>
 
         {mode === "send" && (
           <div className="space-y-4">
             <div className="rounded-xl border border-white/10 bg-slate-800 p-4">
-              <label className="mb-2 block text-sm text-slate-400">
-                Recipient's UID
-              </label>
-              <input
-                type="text"
-                placeholder="Enter recipient's UID (e.g., CP00000001)"
-                className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none focus:border-lime-400"
-                onKeyDown={handleManualUidInput}
-              />
+              <label className="mb-2 block text-sm text-slate-400">Recipient's UID</label>
+              <input type="text" placeholder="Enter recipient's UID" className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none focus:border-lime-400" onKeyDown={handleManualUidInput} />
               <p className="mt-2 text-center text-xs text-slate-500">or</p>
               <label className="mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-lime-400 py-3 text-sm font-semibold text-black transition hover:bg-lime-300">
-                <Camera size={18} />
-                Scan QR Code
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      const uid = prompt("Enter the UID from the QR code:");
-                      if (uid) findUserByUid(uid);
-                    }
-                    e.target.value = "";
-                  }}
-                />
+                <Camera size={18} /> Scan QR Code
+                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) { const uid = prompt("Enter the UID from the QR code:"); if (uid) findUserByUid(uid); } e.target.value = ""; }} />
               </label>
             </div>
-
-            {scanning && (
-              <div className="flex items-center justify-center py-4">
-                <div className="h-6 w-6 animate-spin rounded-full border-2 border-lime-400 border-t-transparent" />
-                <span className="ml-2 text-sm text-slate-400">Searching...</span>
-              </div>
-            )}
-
-            {scannedUser && (
-              <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/20">
-                    <User size={18} className="text-emerald-300" />
-                  </div>
-                  <div>
-                    <div className="font-semibold text-white">
-                      {scannedUser.name || scannedUser.email}
-                    </div>
-                    <div className="text-xs text-slate-400">UID: {scannedUser.uid}</div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div>
-              <label className="mb-2 block text-sm text-slate-400">Amount (USDT)</label>
-              <input
-                type="number"
-                min="1"
-                step="1"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="Enter amount (minimum 1 USDT)"
-                className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none focus:border-lime-400"
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm text-slate-400">Note (Optional)</label>
-              <input
-                type="text"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="Add a note"
-                className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none focus:border-lime-400"
-              />
-            </div>
-
-            <button
-              onClick={handleSendTransfer}
-              disabled={loading || !scannedUser || !amount}
-              className="w-full rounded-xl bg-lime-400 py-3 font-semibold text-black transition hover:bg-lime-300 disabled:opacity-50"
-            >
-              {loading ? "Sending..." : `Send ${amount || "0"} USDT`}
-            </button>
+            {scanning && (<div className="flex items-center justify-center py-4"><div className="h-6 w-6 animate-spin rounded-full border-2 border-lime-400 border-t-transparent" /><span className="ml-2 text-sm text-slate-400">Searching...</span></div>)}
+            {scannedUser && (<div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/20"><User size={18} className="text-emerald-300" /></div><div><div className="font-semibold text-white">{scannedUser.name || scannedUser.email}</div><div className="text-xs text-slate-400">UID: {scannedUser.uid}</div></div></div></div>)}
+            <div><label className="mb-2 block text-sm text-slate-400">Amount (USDT)</label><input type="number" min="1" step="1" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Enter amount (minimum 1 USDT)" className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none focus:border-lime-400" /></div>
+            <div><label className="mb-2 block text-sm text-slate-400">Note (Optional)</label><input type="text" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Add a note" className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none focus:border-lime-400" /></div>
+            <button onClick={handleSendTransfer} disabled={loading || !scannedUser || !amount} className="w-full rounded-xl bg-lime-400 py-3 font-semibold text-black transition hover:bg-lime-300 disabled:opacity-50">{loading ? "Sending..." : `Send ${amount || "0"} USDT`}</button>
           </div>
         )}
 
@@ -570,64 +421,9 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
           <div className="space-y-4">
             <div className="rounded-xl border border-white/10 bg-slate-800 p-4 text-center">
               <p className="text-sm text-slate-400">Share this QR code to receive payments</p>
-              
-              {myQrCode && !qrCodeError ? (
-                <div className="mt-4 flex flex-col items-center">
-                  <img
-                    src={getFullImageUrl(myQrCode)}
-                    alt="Your QR Code"
-                    className="h-48 w-48 rounded-xl border border-white/10 bg-white p-2"
-                    onError={() => setQrCodeError(true)}
-                  />
-                  <button
-                    onClick={() => copyToClipboard(userUid)}
-                    className="mt-4 inline-flex items-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-sm text-white transition hover:bg-white/5"
-                  >
-                    {copied ? <Check size={16} /> : <Copy size={16} />}
-                    {copied ? "Copied!" : "Copy UID"}
-                  </button>
-                  <p className="mt-3 text-xs text-slate-500">
-                    Your UID: <span className="font-mono text-white">{userUid}</span>
-                  </p>
-                </div>
-              ) : qrCodeError ? (
-                <div className="mt-4 flex flex-col items-center">
-                  <div className="flex h-48 w-48 flex-col items-center justify-center rounded-xl border border-red-500/20 bg-red-500/10">
-                    <QrCode size={48} className="text-red-400 mb-2" />
-                    <p className="text-xs text-red-400">QR Code unavailable</p>
-                    <button
-                      onClick={loadMyQrCode}
-                      className="mt-3 rounded-lg bg-lime-400 px-3 py-1 text-xs text-black"
-                    >
-                      Retry
-                    </button>
-                  </div>
-                  <button
-                    onClick={() => copyToClipboard(userUid)}
-                    className="mt-4 inline-flex items-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-sm text-white transition hover:bg-white/5"
-                  >
-                    {copied ? <Check size={16} /> : <Copy size={16} />}
-                    {copied ? "Copied!" : "Copy UID"}
-                  </button>
-                  <p className="mt-3 text-xs text-slate-500">
-                    Your UID: <span className="font-mono text-white">{userUid}</span>
-                  </p>
-                </div>
-              ) : (
-                <div className="mt-4 flex h-48 items-center justify-center">
-                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-lime-400 border-t-transparent" />
-                </div>
-              )}
+              {myQrCode && !qrCodeError ? (<div className="mt-4 flex flex-col items-center"><img src={getFullImageUrl(myQrCode)} alt="Your QR Code" className="h-48 w-48 rounded-xl border border-white/10 bg-white p-2" onError={() => setQrCodeError(true)} /><button onClick={() => copyToClipboard(userUid)} className="mt-4 inline-flex items-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-sm text-white transition hover:bg-white/5">{copied ? <Check size={16} /> : <Copy size={16} />}{copied ? "Copied!" : "Copy UID"}</button><p className="mt-3 text-xs text-slate-500">Your UID: <span className="font-mono text-white">{userUid}</span></p></div>) : qrCodeError ? (<div className="mt-4 flex flex-col items-center"><div className="flex h-48 w-48 flex-col items-center justify-center rounded-xl border border-red-500/20 bg-red-500/10"><QrCode size={48} className="text-red-400 mb-2" /><p className="text-xs text-red-400">QR Code unavailable</p><button onClick={loadMyQrCode} className="mt-3 rounded-lg bg-lime-400 px-3 py-1 text-xs text-black">Retry</button></div><button onClick={() => copyToClipboard(userUid)} className="mt-4 inline-flex items-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-sm text-white transition hover:bg-white/5">{copied ? <Check size={16} /> : <Copy size={16} />}{copied ? "Copied!" : "Copy UID"}</button><p className="mt-3 text-xs text-slate-500">Your UID: <span className="font-mono text-white">{userUid}</span></p></div>) : (<div className="mt-4 flex h-48 items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-2 border-lime-400 border-t-transparent" /></div>)}
             </div>
-
-            <div className="rounded-xl border border-white/10 bg-slate-800 p-4">
-              <h3 className="text-sm font-semibold text-white">How to receive:</h3>
-              <ol className="mt-2 space-y-2 text-xs text-slate-400">
-                <li>1. Share this QR code with the sender</li>
-                <li>2. Or share your UID: <span className="font-mono text-white">{userUid}</span></li>
-                <li>3. Funds will be credited instantly to your wallet</li>
-              </ol>
-            </div>
+            <div className="rounded-xl border border-white/10 bg-slate-800 p-4"><h3 className="text-sm font-semibold text-white">How to receive:</h3><ol className="mt-2 space-y-2 text-xs text-slate-400"><li>1. Share this QR code with the sender</li><li>2. Or share your UID: <span className="font-mono text-white">{userUid}</span></li><li>3. Funds will be credited instantly to your wallet</li></ol></div>
           </div>
         )}
       </div>
@@ -637,111 +433,43 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
 
 export default function AssetsPage() {
   const navigate = useNavigate();
-  const { showError, showSuccess, showVoucher } = useNotification();
+  const { showError } = useNotification();
 
-  const token =
-    localStorage.getItem("userToken") ||
-    localStorage.getItem("token") ||
-    localStorage.getItem("accessToken") ||
-    "";
+  const token = localStorage.getItem("userToken") || localStorage.getItem("token") || localStorage.getItem("accessToken") || "";
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState("");
   const [showQrModal, setShowQrModal] = useState(false);
-  const [wallet, setWallet] = useState({
-    balance: 0,
-    user: null,
-    walletLabel: "Main Wallet",
-  });
+  const [wallet, setWallet] = useState({ balance: 0, user: null, walletLabel: "Main Wallet" });
   const [markets, setMarkets] = useState([]);
   const [holdings, setHoldings] = useState([]);
   const [openTrades, setOpenTrades] = useState([]);
   const [notifications, setNotifications] = useState([]);
-  
-  // Joint Account State
   const [jointAccount, setJointAccount] = useState(null);
   const [jointPartner, setJointPartner] = useState(null);
   const [combinedBalance, setCombinedBalance] = useState(null);
   const [jointBalanceData, setJointBalanceData] = useState(null);
 
-  // Function to calculate holdings from convert transactions
-  async function loadHoldingsFromConvertHistory() {
+  // ✅ FIX: Load real user assets from backend
+  async function loadRealUserAssets() {
     try {
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://cryptopulse-4rhe.onrender.com";
-      const res = await fetch(`${API_BASE_URL}/api/convert/history`, {
+      const res = await fetch(`${API_BASE_URL}/api/user/assets`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
       
-      if (data.success && Array.isArray(data.data)) {
-        const convertTxns = data.data;
-        const holdingsMap = new Map();
-        
-        holdingsMap.set("USDT", {
-          symbol: "USDT",
-          amount: Number(wallet.balance || 0),
-          usdtValue: Number(wallet.balance || 0),
-          unitPrice: 1,
-          avgPrice: 1,
-          spotPnl: 0,
-          spotPnlPercent: 0,
-          accent: getCoinAccent("USDT"),
-          apr: "Up to 50% APR"
-        });
-        
-        for (const tx of convertTxns) {
-          const fromCoin = tx.from_coin?.toUpperCase();
-          const toCoin = tx.to_coin?.toUpperCase();
-          const fromAmount = Number(tx.from_amount || 0);
-          const receiveAmount = Number(tx.receive_amount || tx.to_amount || 0);
-          
-          if (fromCoin && fromCoin !== "USDT") {
-            const current = holdingsMap.get(fromCoin);
-            if (current) {
-              current.amount = Math.max(0, current.amount - fromAmount);
-              if (current.amount < 0.00000001) {
-                holdingsMap.delete(fromCoin);
-              } else {
-                holdingsMap.set(fromCoin, current);
-              }
-            }
-          }
-          
-          if (toCoin && toCoin !== "USDT" && receiveAmount > 0) {
-            const current = holdingsMap.get(toCoin);
-            const price = getCoinPriceInUsdt(toCoin, markets);
-            
-            if (current) {
-              current.amount = (current.amount || 0) + receiveAmount;
-              current.usdtValue = current.amount * price;
-              holdingsMap.set(toCoin, current);
-            } else {
-              holdingsMap.set(toCoin, {
-                symbol: toCoin,
-                amount: receiveAmount,
-                usdtValue: receiveAmount * price,
-                unitPrice: price,
-                avgPrice: price,
-                spotPnl: 0,
-                spotPnlPercent: 0,
-                accent: getCoinAccent(toCoin),
-                apr: ""
-              });
-            }
-          }
-        }
-        
-        const calculatedHoldings = Array.from(holdingsMap.values())
-          .filter(item => item.amount > 0.00000001 && item.symbol !== "USDT")
-          .sort((a, b) => b.usdtValue - a.usdtValue);
-        
-        if (calculatedHoldings.length > 0) {
-          setHoldings(calculatedHoldings);
+      if (data.success && Array.isArray(data.data?.assets)) {
+        const normalizedAssets = normalizeHoldings(data.data.assets, markets);
+        if (normalizedAssets.length > 0) {
+          setHoldings(normalizedAssets);
+          return true;
         }
       }
+      return false;
     } catch (err) {
-      console.error("Failed to load convert history:", err);
+      console.error("Failed to load user assets:", err);
+      return false;
     }
   }
 
@@ -750,84 +478,42 @@ export default function AssetsPage() {
       if (!silent) setLoading(true);
       else setRefreshing(true);
 
-      setError("");
-
       const tasks = [
         userApi.getWalletSummary(token),
         marketApi.home(),
-        typeof tradeApi?.open === "function" ? tradeApi.open(token) : Promise.resolve({ data: { data: [] } }),
-        typeof userApi?.getNotifications === "function"
-          ? userApi.getNotifications(token)
-          : Promise.resolve({ data: { data: [] } }),
+        tradeApi.open(token).catch(() => ({ data: { data: [] } })),
+        userApi.getNotifications(token).catch(() => ({ data: { data: [] } })),
         userApi.getJointAccountStatus(token),
-      ];
-
-      if (typeof userApi?.getAssetHoldings === "function") {
-        tasks.push(userApi.getAssetHoldings(token));
-      } else if (typeof userApi?.getAssets === "function") {
-        tasks.push(userApi.getAssets(token));
-      } else if (typeof userApi?.getPortfolioAssets === "function") {
-        tasks.push(userApi.getPortfolioAssets(token));
-      } else {
-        tasks.push(Promise.resolve({ data: { data: [] } }));
-      }
-
-      tasks.push(
         fetch(`${import.meta.env.VITE_API_BASE_URL || "https://cryptopulse-4rhe.onrender.com"}/api/joint-account/combined-balance`, {
           headers: { Authorization: `Bearer ${token}` }
         }).then(res => res.json())
-      );
+      ];
 
-      const [walletRes, marketRes, openTradeRes, notificationRes, jointRes, holdingsRes, combinedRes] =
-        await Promise.allSettled(tasks);
+      const [walletRes, marketRes, openTradeRes, notificationRes, jointRes, combinedRes] = await Promise.allSettled(tasks);
 
       if (walletRes.status === "fulfilled") {
         const data = walletRes.value?.data?.data || {};
-        setWallet({
-          balance: Number(data.balance || 0),
-          user: data.user || null,
-          walletLabel: data.walletLabel || "Main Wallet",
-        });
-        
-        if (!silent) {
-          await loadHoldingsFromConvertHistory();
-        }
+        setWallet({ balance: Number(data.balance || 0), user: data.user || null, walletLabel: data.walletLabel || "Main Wallet" });
       }
 
       if (marketRes.status === "fulfilled") {
-        const rows = Array.isArray(marketRes.value?.data?.data)
-          ? marketRes.value.data.data
-          : [];
-        setMarkets(rows);
+        setMarkets(Array.isArray(marketRes.value?.data?.data) ? marketRes.value.data.data : []);
       }
 
       if (openTradeRes.status === "fulfilled") {
-        setOpenTrades(
-          Array.isArray(openTradeRes.value?.data?.data)
-            ? openTradeRes.value.data.data
-            : []
-        );
+        setOpenTrades(Array.isArray(openTradeRes.value?.data?.data) ? openTradeRes.value.data.data : []);
       }
 
       if (notificationRes.status === "fulfilled") {
-        setNotifications(
-          Array.isArray(notificationRes.value?.data?.data)
-            ? notificationRes.value.data.data
-            : []
-        );
+        setNotifications(Array.isArray(notificationRes.value?.data?.data) ? notificationRes.value.data.data : []);
       }
 
       if (combinedRes.status === "fulfilled" && combinedRes.value?.success) {
         const balanceData = combinedRes.value.data;
         setJointBalanceData(balanceData);
-        
         if (balanceData.hasJointAccount) {
           setCombinedBalance(balanceData.combinedBalance);
-          setJointPartner({
-            name: balanceData.partnerName,
-            uid: balanceData.partnerUid,
-            balance: balanceData.partnerBalance
-          });
+          setJointPartner({ name: balanceData.partnerName, uid: balanceData.partnerUid, balance: balanceData.partnerBalance });
         } else {
           setCombinedBalance(null);
           setJointPartner(null);
@@ -836,26 +522,12 @@ export default function AssetsPage() {
 
       if (jointRes.status === "fulfilled" && jointRes.value?.data?.success) {
         const jointData = jointRes.value.data.data;
-        if (jointData.hasJointAccount && jointData.jointAccount) {
-          setJointAccount(jointData.jointAccount);
-        } else {
-          setJointAccount(null);
-        }
+        setJointAccount(jointData.hasJointAccount ? jointData.jointAccount : null);
       }
 
-      if (holdingsRes.status === "fulfilled") {
-        const rows =
-          holdingsRes.value?.data?.data?.assets ||
-          holdingsRes.value?.data?.data?.holdings ||
-          holdingsRes.value?.data?.assets ||
-          holdingsRes.value?.data?.holdings ||
-          holdingsRes.value?.data?.data ||
-          [];
+      // ✅ FIX: Load real user assets
+      await loadRealUserAssets();
 
-        if (Array.isArray(rows) && rows.length > 0) {
-          setHoldings(rows);
-        }
-      }
     } catch (err) {
       showError(getApiErrorMessage(err));
     } finally {
@@ -871,16 +543,11 @@ export default function AssetsPage() {
   useEffect(() => {
     loadData();
 
-    const interval = setInterval(() => {
-      loadData(true);
-    }, 10000);
+    // ✅ FIX: Changed refresh rate from 10s to 30s
+    const interval = setInterval(() => loadData(true), 30000);
 
     const onFocus = () => loadData(true);
-    const onStorage = (e) => {
-      if (e.key === "cryptopulse_assets_refresh") {
-        loadData(true);
-      }
-    };
+    const onStorage = (e) => { if (e.key === "cryptopulse_assets_refresh") loadData(true); };
 
     window.addEventListener("focus", onFocus);
     window.addEventListener("storage", onStorage);
@@ -893,49 +560,35 @@ export default function AssetsPage() {
   }, []);
 
   const displayBalance = combinedBalance !== null ? combinedBalance : Number(wallet.balance || 0);
-  const totalBalance = displayBalance;
   
   const normalizedHoldings = useMemo(() => {
-    if (holdings.length > 0) {
-      return normalizeHoldings(holdings, markets);
+    if (holdings.length > 0) return holdings;
+    // Fallback: just show USDT
+    if (Number(wallet.balance || 0) > 0) {
+      return [{
+        symbol: "USDT",
+        amount: Number(wallet.balance || 0),
+        usdtValue: Number(wallet.balance || 0),
+        unitPrice: 1,
+        avgPrice: 1,
+        spotPnl: 0,
+        spotPnlPercent: 0,
+        accent: getCoinAccent("USDT"),
+        apr: "Up to 50% APR",
+        logo: COIN_LOGOS.USDT,
+      }];
     }
-    return buildFallbackAssets(Number(wallet.balance || 0), markets);
-  }, [holdings, wallet.balance, markets]);
+    return [];
+  }, [holdings, wallet.balance]);
 
-  const totalSpotPnl = useMemo(() => {
-    return normalizedHoldings.reduce(
-      (sum, item) => sum + Number(item.spotPnl || 0),
-      0
-    );
-  }, [normalizedHoldings]);
-
-  const totalInvested = useMemo(() => {
-    return normalizedHoldings.reduce((sum, item) => {
-      return sum + Number(item.usdtValue || 0) - Number(item.spotPnl || 0);
-    }, 0);
-  }, [normalizedHoldings]);
-
-  const pnlPercent = useMemo(() => {
-    if (!totalInvested) return 0;
-    return (totalSpotPnl / totalInvested) * 100;
-  }, [totalSpotPnl, totalInvested]);
-
-  const tradingAmount = useMemo(() => {
-    return openTrades.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-  }, [openTrades]);
-
-  const unreadNotifications = useMemo(() => {
-    return notifications.filter((item) => !Number(item?.is_read)).length;
-  }, [notifications]);
+  const totalSpotPnl = useMemo(() => normalizedHoldings.reduce((sum, item) => sum + Number(item.spotPnl || 0), 0), [normalizedHoldings]);
+  const totalInvested = useMemo(() => normalizedHoldings.reduce((sum, item) => sum + Number(item.usdtValue || 0) - Number(item.spotPnl || 0), 0), [normalizedHoldings]);
+  const pnlPercent = totalInvested ? (totalSpotPnl / totalInvested) * 100 : 0;
+  const tradingAmount = useMemo(() => openTrades.reduce((sum, item) => sum + Number(item.amount || 0), 0), [openTrades]);
+  const unreadNotifications = useMemo(() => notifications.filter((item) => !Number(item?.is_read)).length, [notifications]);
 
   if (loading) {
-    return (
-      <div className="space-y-5 bg-black p-3 sm:p-5">
-        <section className="rounded-[28px] border border-white/10 bg-[#111111] p-5 text-sm text-slate-300 shadow-2xl">
-          Loading assets...
-        </section>
-      </div>
-    );
+    return (<div className="space-y-5 bg-black p-3 sm:p-5"><section className="rounded-[28px] border border-white/10 bg-[#111111] p-5 text-sm text-slate-300 shadow-2xl">Loading assets...</section></div>);
   }
 
   return (
@@ -943,176 +596,48 @@ export default function AssetsPage() {
       <section className="rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(163,230,53,0.18),transparent_18%),linear-gradient(180deg,#0a0a0a_0%,#050505_100%)] p-4 shadow-[0_18px_60px_rgba(0,0,0,0.42)] sm:p-5">
         <div className="flex items-center justify-between">
           <div className="text-lg font-semibold text-white sm:text-xl">Assets</div>
-
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => navigate("/transactions")}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-white transition hover:bg-white/[0.06]"
-            >
-              <Bell size={17} />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => loadData(true)}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-white transition hover:bg-white/[0.06]"
-            >
-              <RefreshCw size={17} className={refreshing ? "animate-spin" : ""} />
-            </button>
+            <button type="button" onClick={() => navigate("/transactions")} className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-white transition hover:bg-white/[0.06]"><Bell size={17} /></button>
+            <button type="button" onClick={() => loadData(true)} className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-white transition hover:bg-white/[0.06]"><RefreshCw size={17} className={refreshing ? "animate-spin" : ""} /></button>
           </div>
         </div>
-
         <div className="mt-6">
-          <div className="text-sm text-slate-400">
-            {combinedBalance !== null ? "Combined Total Value" : "Est total value"}
-          </div>
-          <div className="mt-2 flex items-end gap-2">
-            <div className="text-4xl font-bold tracking-tight text-white sm:text-5xl">
-              {formatMoney(displayBalance)}
-            </div>
-            <div className="mb-1 text-lg font-semibold text-white sm:text-xl">USD</div>
-          </div>
-
-          {jointBalanceData?.hasJointAccount && (
-            <div className="mt-2 text-xs text-slate-500">
-              Your balance: {formatMoney(jointBalanceData.userBalance)} USDT + 
-              {jointPartner?.name}'s balance: {formatMoney(jointBalanceData.partnerBalance)} USDT
-            </div>
-          )}
-
-          <button
-            type="button"
-            onClick={() => navigate("/transactions")}
-            className="mt-3 inline-flex items-center gap-1.5 text-sm text-slate-400 transition hover:text-white sm:text-base"
-          >
-            <span>
-              Today&apos;s PnL {totalSpotPnl >= 0 ? "+" : "-"}$
-              {formatMoney(Math.abs(totalSpotPnl))} ({totalSpotPnl >= 0 ? "+" : ""}
-              {Number(pnlPercent).toFixed(2)}%)
-            </span>
-            <ChevronRight size={16} />
-          </button>
+          <div className="text-sm text-slate-400">{combinedBalance !== null ? "Combined Total Value" : "Est total value"}</div>
+          <div className="mt-2 flex items-end gap-2"><div className="text-4xl font-bold tracking-tight text-white sm:text-5xl">{formatMoney(displayBalance)}</div><div className="mb-1 text-lg font-semibold text-white sm:text-xl">USD</div></div>
+          {jointBalanceData?.hasJointAccount && (<div className="mt-2 text-xs text-slate-500">Your balance: {formatMoney(jointBalanceData.userBalance)} USDT + {jointPartner?.name}'s balance: {formatMoney(jointBalanceData.partnerBalance)} USDT</div>)}
+          <button type="button" onClick={() => navigate("/transactions")} className="mt-3 inline-flex items-center gap-1.5 text-sm text-slate-400 transition hover:text-white sm:text-base"><span>Today&apos;s PnL {totalSpotPnl >= 0 ? "+" : "-"}${formatMoney(Math.abs(totalSpotPnl))} ({totalSpotPnl >= 0 ? "+" : ""}{Number(pnlPercent).toFixed(2)}%)</span><ChevronRight size={16} /></button>
         </div>
-
         <div className="mt-6 grid grid-cols-4 gap-2 sm:gap-3">
-          <CircleAction
-            icon={ArrowDownToLine}
-            label="Deposit"
-            onClick={() => navigate("/deposit")}
-          />
-          <CircleAction
-            icon={ArrowUpToLine}
-            label="Withdraw"
-            onClick={() => navigate("/withdraw")}
-          />
-          <CircleAction
-            icon={ArrowRightLeft}
-            label="Convert"
-            onClick={() => navigate("/convert")}
-          />
-          <CircleAction
-            icon={QrCode}
-            label="Transfer"
-            onClick={() => setShowQrModal(true)}
-          />
+          <CircleAction icon={ArrowDownToLine} label="Deposit" onClick={() => navigate("/deposit")} />
+          <CircleAction icon={ArrowUpToLine} label="Withdraw" onClick={() => navigate("/withdraw")} />
+          <CircleAction icon={ArrowRightLeft} label="Convert" onClick={() => navigate("/convert")} />
+          <CircleAction icon={QrCode} label="Transfer" onClick={() => setShowQrModal(true)} />
         </div>
       </section>
 
       <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-white sm:text-3xl">Portfolio</h2>
-
-          <button
-            type="button"
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-slate-300 transition hover:bg-white/[0.06]"
-          >
-            <SlidersHorizontal size={17} />
-          </button>
-        </div>
-
+        <div className="flex items-center justify-between"><h2 className="text-2xl font-bold text-white sm:text-3xl">Portfolio</h2><button type="button" className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-slate-300 transition hover:bg-white/[0.06]"><SlidersHorizontal size={17} /></button></div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <PortfolioCard
-            value={displayBalance < 0.01 ? "$<0.01" : `$${formatMoney(displayBalance)}`}
-            title={combinedBalance !== null ? "Combined Balance" : "Funding"}
-            subtext={combinedBalance !== null && jointPartner 
-              ? `${jointPartner.name || "Partner"} + You` 
-              : `${normalizedHoldings.length} assets`}
-          />
-          <PortfolioCard
-            value={tradingAmount < 0.01 ? "$0" : `$${formatMoney(tradingAmount)}`}
-            title="Trading"
-            subtext={`${openTrades.length} open trade${openTrades.length === 1 ? "" : "s"}`}
-          />
-          <PortfolioCard
-            value={String(unreadNotifications)}
-            title="Notification"
-            subtext={unreadNotifications === 1 ? "Unread alert" : "Unread alerts"}
-          />
+          <PortfolioCard value={displayBalance < 0.01 ? "$<0.01" : `$${formatMoney(displayBalance)}`} title={combinedBalance !== null ? "Combined Balance" : "Funding"} subtext={combinedBalance !== null && jointPartner ? `${jointPartner.name || "Partner"} + You` : `${normalizedHoldings.length} assets`} />
+          <PortfolioCard value={tradingAmount < 0.01 ? "$0" : `$${formatMoney(tradingAmount)}`} title="Trading" subtext={`${openTrades.length} open trade${openTrades.length === 1 ? "" : "s"}`} />
+          <PortfolioCard value={String(unreadNotifications)} title="Notification" subtext={unreadNotifications === 1 ? "Unread alert" : "Unread alerts"} />
         </div>
-
-        {jointAccount && jointPartner && jointBalanceData && (
-          <PortfolioCard
-            value={`${formatMoney(jointBalanceData.userBalance)} + ${formatMoney(jointBalanceData.partnerBalance)}`}
-            title={`Joint Account: You + ${jointPartner.name || jointPartner.uid}`}
-            subtext={`Total: ${formatMoney(jointBalanceData.combinedBalance)} USDT • Account ID: ${jointAccount.account_id}`}
-            icon={Users}
-            tone="text-lime-300"
-          />
-        )}
+        {jointAccount && jointPartner && jointBalanceData && (<PortfolioCard value={`${formatMoney(jointBalanceData.userBalance)} + ${formatMoney(jointBalanceData.partnerBalance)}`} title={`Joint Account: You + ${jointPartner.name || jointPartner.uid}`} subtext={`Total: ${formatMoney(jointBalanceData.combinedBalance)} USDT • Account ID: ${jointAccount.account_id}`} icon={Users} tone="text-lime-300" />)}
       </section>
 
       <section className="space-y-3">
-        <div className="flex items-end justify-between gap-3">
-          <div>
-            <h2 className="text-2xl font-bold text-white sm:text-3xl">Crypto</h2>
-            <div className="mt-1 flex justify-between gap-3 text-xs text-slate-500 sm:text-sm">
-              <span>Name/Amount</span>
-            </div>
-          </div>
-
-          <div className="text-right text-xs text-slate-500 sm:text-sm">
-            Value/Spot PnL
-          </div>
-        </div>
-
+        <div className="flex items-end justify-between gap-3"><div><h2 className="text-2xl font-bold text-white sm:text-3xl">Crypto</h2><div className="mt-1 flex justify-between gap-3 text-xs text-slate-500 sm:text-sm"><span>Name/Amount</span></div></div><div className="text-right text-xs text-slate-500 sm:text-sm">Value/Spot PnL</div></div>
         <div className="space-y-2.5">
-          {normalizedHoldings.map((item) => (
-            <AssetRow key={item.symbol} item={item} />
-          ))}
+          {normalizedHoldings.length > 0 ? normalizedHoldings.map((item) => (<AssetRow key={item.symbol} item={item} />)) : (<div className="rounded-[24px] border border-white/10 bg-[#111111] p-8 text-center text-slate-400">No assets found. Start by depositing or converting funds.</div>)}
         </div>
       </section>
 
       <section className="rounded-[28px] border border-white/10 bg-[#111111] p-4 shadow-[0_16px_50px_rgba(0,0,0,0.32)] sm:p-5">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-2xl font-bold text-white sm:text-3xl">
-            Recent funding history
-          </h2>
-          <button
-            type="button"
-            onClick={() => navigate("/transactions")}
-            className="text-slate-300 transition hover:text-white"
-          >
-            <ChevronRight size={20} />
-          </button>
-        </div>
-
-        <div className="mt-4">
-          <HistoryRow
-            title="Place an order"
-            date={new Date().toLocaleString()}
-            amount={`-${formatMoney(displayBalance > 0 ? Math.min(displayBalance, 371) : 0)} USDT`}
-            negative
-          />
-        </div>
+        <div className="flex items-center justify-between gap-3"><h2 className="text-2xl font-bold text-white sm:text-3xl">Recent funding history</h2><button type="button" onClick={() => navigate("/transactions")} className="text-slate-300 transition hover:text-white"><ChevronRight size={20} /></button></div>
+        <div className="mt-4"><HistoryRow title="Place an order" date={new Date().toLocaleString()} amount={`-${formatMoney(displayBalance > 0 ? Math.min(displayBalance, 371) : 0)} USDT`} negative /></div>
       </section>
 
-      {/* QR Transfer Modal */}
-      <QrTransferModal
-        isOpen={showQrModal}
-        onClose={() => setShowQrModal(false)}
-        onTransferComplete={handleTransferComplete}
-      />
+      <QrTransferModal isOpen={showQrModal} onClose={() => setShowQrModal(false)} onTransferComplete={handleTransferComplete} />
     </div>
   );
 }
