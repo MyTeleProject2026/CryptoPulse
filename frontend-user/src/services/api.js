@@ -170,6 +170,16 @@ export const userApi = {
         "Content-Type": "multipart/form-data",
       },
     }),
+  
+  // Add this inside your existing userApi object
+  getUserAssets: (token) => {
+    return api.get("/api/user/assets", authHeaders(token));
+  },
+  
+  // Also add this for direct portfolio assets
+  getPortfolioAssetsDirect: (token) => {
+    return api.get("/api/user/portfolio-assets-direct", authHeaders(token));
+  },
 
   getWalletSummary: (token) =>
     api.get("/api/wallet/summary", authHeaders(token)),
