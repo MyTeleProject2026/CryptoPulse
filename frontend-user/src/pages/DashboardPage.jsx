@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import { userApi, marketApi, getApiErrorMessage } from "../services/api";
 import { useNotification } from "../hooks/useNotification";
-// ========== ADDED: Import NewsSlider component ==========
 import NewsSlider from "../components/NewsSlider";
 
 function formatMoney(value) {
@@ -39,7 +38,7 @@ function StatCard({ title, value, change, icon: Icon, onClick, subtext }) {
   return (
     <div 
       onClick={onClick}
-      className={`rounded-xl border border-white/10 bg-[#0a0e1a] p-4 transition hover:scale-[1.02] ${onClick ? "cursor-pointer" : ""}`}
+      className={`rounded-xl border border-white/10 bg-[#111111] p-4 transition hover:scale-[1.02] ${onClick ? "cursor-pointer" : ""}`}
     >
       <div className="flex items-center justify-between">
         <div className="text-xs text-slate-500">{title}</div>
@@ -52,7 +51,7 @@ function StatCard({ title, value, change, icon: Icon, onClick, subtext }) {
         </div>
       )}
       {subtext && (
-        <div className="mt-1 text-[10px] text-cyan-400">{subtext}</div>
+        <div className="mt-1 text-[10px] text-lime-400">{subtext}</div>
       )}
     </div>
   );
@@ -62,9 +61,9 @@ function ActionButton({ icon: Icon, label, onClick }) {
   return (
     <button
       onClick={onClick}
-      className="flex flex-col items-center gap-1 rounded-xl bg-[#0a0e1a] border border-white/10 px-4 py-2 transition hover:border-cyan-500/50 hover:bg-cyan-500/5"
+      className="flex flex-col items-center gap-1 rounded-xl bg-[#111111] border border-white/10 px-4 py-2 transition hover:border-lime-500/50 hover:bg-lime-500/5"
     >
-      <Icon size={18} className="text-cyan-400" />
+      <Icon size={18} className="text-lime-400" />
       <span className="text-xs text-white">{label}</span>
     </button>
   );
@@ -76,7 +75,7 @@ function MarketRow({ symbol, price, change, onClick }) {
   return (
     <div 
       onClick={onClick}
-      className="flex cursor-pointer items-center justify-between rounded-lg border border-white/5 bg-[#0a0e1a] px-3 py-2 transition hover:border-cyan-500/30"
+      className="flex cursor-pointer items-center justify-between rounded-lg border border-white/5 bg-[#111111] px-3 py-2 transition hover:border-lime-500/30"
     >
       <div>
         <div className="text-sm font-semibold text-white">{symbol}</div>
@@ -110,11 +109,13 @@ export default function DashboardPage() {
       if (!silent) setLoading(true);
       else setRefreshing(true);
 
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://cryptopulse-4rhe.onrender.com";
+
       const [walletRes, marketRes, notifRes, combinedRes] = await Promise.allSettled([
         userApi.getWalletSummary(token),
         marketApi.home(),
         userApi.getNotifications(token),
-        fetch(`${import.meta.env.VITE_API_BASE_URL || "https://cryptopulse-4rhe.onrender.com"}/api/joint-account/combined-balance`, {
+        fetch(`${API_BASE_URL}/api/joint-account/combined-balance`, {
           headers: { Authorization: `Bearer ${token}` }
         }).then(res => res.json())
       ]);
@@ -155,21 +156,21 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#050812]">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500 border-t-transparent" />
+      <div className="flex min-h-screen items-center justify-center bg-black">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-lime-500 border-t-transparent" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#050812] p-4">
+    <div className="min-h-screen bg-black p-4">
       {/* Top Bar */}
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="text-xl font-bold text-white">CryptoPulse</div>
           <button
             onClick={() => loadData(true)}
-            className="rounded-full bg-[#0a0e1a] p-2 text-slate-400 transition hover:text-white"
+            className="rounded-full bg-[#111111] p-2 text-slate-400 transition hover:text-white"
           >
             <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
           </button>
@@ -178,7 +179,7 @@ export default function DashboardPage() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate("/transactions")}
-            className="relative rounded-full bg-[#0a0e1a] p-2 text-slate-400 transition hover:text-white"
+            className="relative rounded-full bg-[#111111] p-2 text-slate-400 transition hover:text-white"
           >
             <Bell size={16} />
             {unreadCount > 0 && (
@@ -189,14 +190,14 @@ export default function DashboardPage() {
           </button>
           <button
             onClick={() => navigate("/assets")}
-            className="rounded-full bg-[#0a0e1a] p-2 text-slate-400 transition hover:text-white"
+            className="rounded-full bg-[#111111] p-2 text-slate-400 transition hover:text-white"
           >
             <Wallet size={16} />
           </button>
         </div>
       </div>
 
-      {/* ========== ADDED: News Slider Section ========== */}
+      {/* News Slider */}
       <div className="mb-4">
         <NewsSlider />
       </div>
@@ -239,7 +240,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Hot Pairs Section */}
-      <div className="rounded-xl border border-white/10 bg-[#0a0e1a]">
+      <div className="rounded-xl border border-white/10 bg-[#111111]">
         <div className="border-b border-white/10 px-4 py-3">
           <h3 className="text-sm font-semibold text-white">Hot Pairs</h3>
         </div>
