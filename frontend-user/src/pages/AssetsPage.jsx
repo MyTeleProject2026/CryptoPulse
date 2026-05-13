@@ -325,18 +325,23 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
       setQrCodeError(false);
       console.log("Fetching QR code from:", `${API_BASE_URL}/api/user/qr-code`);
       
-      const res = await fetch(`${API_BASE_URL}/api/user/qr-code`, {
+      const res = await fetch(`${API_BQSE_URL}/api/user/qr-code`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
       console.log("QR Code API Response:", data);
       
-      if (data.success && data.data?.qr_code_base64) {
-        console.log("QR code received as base64");
-        setMyQrCode(data.data.qr_code_base64);
-      } else if (data.success && data.data?.qr_code_url) {
-        console.log("QR code received as URL:", data.data.qr_code_url);
-        setMyQrCode(data.data.qr_code_url);
+      if (data.success) {
+        // Try multiple possible field names
+        const qrData = data.data?.qr_code_base64 || data.data?.qr_base64 || data.data?.qr_code_url || data.data?.qr_url;
+        
+        if (qrData) {
+          console.log("QR code received, length:", qrData.length);
+          setMyQrCode(qrData);
+        } else {
+          setQrCodeError(true);
+          console.error("No QR data in response:", data);
+        }
       } else {
         setQrCodeError(true);
         console.error("QR code generation failed:", data);
