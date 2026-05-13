@@ -281,7 +281,7 @@ function HistoryRow({ title, date, amount, negative = false }) {
   );
 }
 
-// QR Transfer Modal Component (with working QR code generation)
+// QR Transfer Modal Component
 function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
   const [mode, setMode] = useState("send");
   const [scanning, setScanning] = useState(false);
@@ -298,7 +298,7 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
   const token = localStorage.getItem("userToken") || localStorage.getItem("token") || "";
   const { showSuccess, showError, showVoucher } = useNotification();
 
-  // API Base URL
+  // API Base URL - CryptoPulse backend
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://cryptopulse-4rhe.onrender.com";
 
   useEffect(() => {
@@ -323,25 +323,12 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
   async function loadMyQrCode() {
     try {
       setQrCodeError(false);
-      console.log("Fetching QR code from:", `${API_BASE_URL}/api/user/qr-code`);
-      
-      const res = await fetch(`${API_BQSE_URL}/api/user/qr-code`, {
+      const res = await fetch(`${API_BASE_URL}/api/user/qr-code`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
-      console.log("QR Code API Response:", data);
-      
-      if (data.success) {
-        // Try multiple possible field names
-        const qrData = data.data?.qr_code_base64 || data.data?.qr_base64 || data.data?.qr_code_url || data.data?.qr_url;
-        
-        if (qrData) {
-          console.log("QR code received, length:", qrData.length);
-          setMyQrCode(qrData);
-        } else {
-          setQrCodeError(true);
-          console.error("No QR data in response:", data);
-        }
+      if (data.success && data.data?.qr_code_base64) {
+        setMyQrCode(data.data.qr_code_base64);
       } else {
         setQrCodeError(true);
         console.error("QR code generation failed:", data);
@@ -453,7 +440,7 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
 
   function getFullImageUrl(url) {
     if (!url) return null;
-    if (url.startsWith('data:image/')) return url;
+    if (url && url.startsWith('data:image/')) return url;
     if (url.startsWith("http://") || url.startsWith("https://")) return url;
     return `${API_BASE_URL}${url}`;
   }
