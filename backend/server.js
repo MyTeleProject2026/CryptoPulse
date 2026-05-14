@@ -7625,7 +7625,7 @@ app.delete("/api/admin/fund-rules/:id", authenticateAdmin, async (req, res, next
 ========================= */
 
 // Get admin notifications (aggregated from various sources)
-app.get("/api/admin/notifications", authenticateAdmin, async (req, res, next) => {
+app.get("/", authenticateAdmin, async (req, res, next) => {
   try {
     const notifications = [];
 
@@ -7717,7 +7717,7 @@ app.get("/api/admin/notifications", authenticateAdmin, async (req, res, next) =>
 });
 
 // Mark notification as read (store in memory or session)
-app.put("/api/admin/notifications/:id/read", authenticateAdmin, async (req, res, next) => {
+app.put("//:id/read", authenticateAdmin, async (req, res, next) => {
   try {
     // For now, just return success
     // In production, you would store read status in a database table
@@ -7734,7 +7734,10 @@ app.put("/api/admin/notifications/:id/read", authenticateAdmin, async (req, res,
    ADMIN NOTIFICATIONS SEND
 ========================= */
 
-// ✅ FIX: Add missing notifications send endpoint
+/* =========================
+   ADMIN NOTIFICATIONS SEND
+========================= */
+
 app.post("/api/admin/notifications/send", authenticateAdmin, async (req, res, next) => {
   const connection = await pool.getConnection();
   
@@ -7771,13 +7774,24 @@ app.post("/api/admin/notifications/send", authenticateAdmin, async (req, res, ne
       });
     }
     
-    // Insert notification
-    await connection.execute(
-      `INSERT INTO user_notifications 
-       (user_id, title, message, type, is_read, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 0, NOW(), NOW())`,
-      [user_id, title, message, type || "admin"]
-    );
+    // ✅ FIX: Check table columns first
+    const [columns] = await connection.execute(`SHOW COLUMNS FROM user_notifications`);
+    const columnNames = columns.map(col => String(col.Field || "").toLowerCase());
+    
+    // Build insert query dynamically based on existing columns
+    const insertFields = ["user_id", "title", "message", "type", "is_read", "created_at"];
+    const placeholders = ["?", "?", "?", "?", "0", "NOW()"];
+    const values = [user_id, title, message, type || "admin"];
+    
+    // Only include updated_at if column exists
+    if (columnNames.includes("updated_at")) {
+      insertFields.push("updated_at");
+      placeholders.push("NOW()");
+    }
+    
+    const query = `INSERT INTO user_notifications (${insertFields.join(", ")}) VALUES (${placeholders.join(", ")})`;
+    
+    await connection.execute(query, values);
     
     // Log the action
     await createAuditLog(connection, {
@@ -7796,11 +7810,13 @@ app.post("/api/admin/notifications/send", authenticateAdmin, async (req, res, ne
     
   } catch (error) {
     await connection.rollback();
+    console.error("Send notification error:", error);
     next(error);
   } finally {
     connection.release();
   }
 });
+
 /* =========================
    JOINT ACCOUNT
 ========================= */
