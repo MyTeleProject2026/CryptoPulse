@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { RefreshCw, Search, ImageOff, ExternalLink } from "lucide-react";
 import { adminApi, getApiErrorMessage } from "../../services/api";
+// ✅ ADDED: Import toast notification
+import { addToast, ToastContainer } from "../../components/ToastNotification";
 
 const RAW_API_BASE =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
@@ -118,8 +120,16 @@ export default function AdminDepositsPage() {
       setError("");
       const res = await adminApi.getDeposits(token);
       setDeposits(Array.isArray(res.data?.data) ? res.data.data : []);
+      
+      // ✅ ADDED: Toast notification for silent refresh
+      if (silentRefresh) {
+        addToast("Deposits refreshed", "success");
+      }
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      const errorMsg = getApiErrorMessage(err);
+      setError(errorMsg);
+      // ✅ ADDED: Toast notification for error
+      addToast(errorMsg, "error");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -136,10 +146,15 @@ export default function AdminDepositsPage() {
       setSuccess("");
 
       await adminApi.approveDeposit(id, {}, token);
-      setSuccess(`Deposit #${id} approved successfully.`);
+      const successMsg = `Deposit #${id} approved successfully.`;
+      setSuccess(successMsg);
+      // ✅ ADDED: Toast notification for approve success
+      addToast(successMsg, "success");
       await fetchDeposits(false, false);
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      const errorMsg = getApiErrorMessage(err);
+      setError(errorMsg);
+      addToast(errorMsg, "error");
     } finally {
       setActionLoading("");
     }
@@ -155,10 +170,15 @@ export default function AdminDepositsPage() {
       setSuccess("");
 
       await adminApi.rejectDeposit(id, {}, token);
-      setSuccess(`Deposit #${id} rejected successfully.`);
+      const successMsg = `Deposit #${id} rejected successfully.`;
+      setSuccess(successMsg);
+      // ✅ ADDED: Toast notification for reject success
+      addToast(successMsg, "success");
       await fetchDeposits(false, false);
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      const errorMsg = getApiErrorMessage(err);
+      setError(errorMsg);
+      addToast(errorMsg, "error");
     } finally {
       setActionLoading("");
     }
@@ -235,6 +255,9 @@ export default function AdminDepositsPage() {
 
   return (
     <div className="space-y-5">
+      {/* ✅ ADDED: Toast Container */}
+      <ToastContainer />
+
       <section className="rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(34,197,94,0.08),transparent_18%),linear-gradient(180deg,#111827_0%,#020617_100%)] p-5 shadow-xl">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
