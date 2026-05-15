@@ -186,6 +186,7 @@ export default function ConvertPage() {
     }
   }
 
+  // ✅ FIX: Force refresh fee from backend with cache-busting
   async function loadData(silent = false) {
     try {
       if (!silent) setLoading(true);
@@ -217,11 +218,14 @@ export default function ConvertPage() {
 
       if (platformRes.status === "fulfilled") {
         const settings = platformRes.value?.data?.data || {};
+        const newFee = Number(settings.default_convert_fee_percent ?? 0.2);
+        
+        // ✅ DEBUG: Log the fee from backend
+        console.log("📊 CryptoPulse Fee from backend:", newFee, "Raw settings:", settings);
+        
         setPlatformSettings({
           wallet_label: settings.wallet_label || "Main Wallet",
-          default_convert_fee_percent: Number(
-            settings.default_convert_fee_percent ?? 0.2
-          ),
+          default_convert_fee_percent: newFee,
         });
       }
 
@@ -237,15 +241,28 @@ export default function ConvertPage() {
     }
   }
 
+  // ✅ FIX: Refresh when page becomes visible and every 30 seconds
   useEffect(() => {
     loadData();
 
-    // ✅ FIX: Changed refresh rate from 10s to 30s
+    // ✅ FIX: Refresh every 30 seconds (instead of 10)
     const interval = setInterval(() => {
       loadData(true);
     }, 30000);
 
-    return () => clearInterval(interval);
+    // ✅ FIX: Refresh when tab becomes visible again
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log("🔄 Tab visible, refreshing CryptoPulse fee...");
+        loadData(true);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   const pairMap = useMemo(() => buildPairPriceMap(markets), [markets]);
@@ -258,9 +275,17 @@ export default function ConvertPage() {
     return getCoinPriceInUsdt(form.toCoin, pairMap);
   }, [form.toCoin, pairMap]);
 
+  // ✅ FIX: Calculate fee with proper debugging
   const convertFeePercent = useMemo(() => {
-    const num = Number(platformSettings.default_convert_fee_percent || 0.2);
-    return Number.isFinite(num) ? num : 0.2;
+    const num = Number(platformSettings.default_convert_fee_percent);
+    const finalFee = Number.isFinite(num) ? num : 0.2;
+    
+    // ✅ DEBUG: Log when fee changes
+    if (finalFee !== 0.2) {
+      console.log("🔧 CryptoPulse using custom fee:", finalFee, "%");
+    }
+    
+    return finalFee;
   }, [platformSettings.default_convert_fee_percent]);
 
   // ✅ FIX: Get balance for selected coin (USDT from wallet, others from portfolioAssets)
@@ -540,7 +565,7 @@ export default function ConvertPage() {
         <SummaryStat
           label="Convert Fee"
           value={`${convertFeePercent}%`}
-          subtext="Live admin-configured calculation"
+          subtext="Live system-configured calculation"
           icon={TrendingUp}
           tone="text-emerald-300"
         />
