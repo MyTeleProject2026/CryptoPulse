@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { RefreshCw, CheckCircle, XCircle, Clock } from "lucide-react";
 import { adminApi, getApiErrorMessage } from "../../services/api";
-import useToast from "../../components/ToastNotification";
+// ✅ FIXED: Import toast notification correctly
+import { addToast, ToastContainer } from "../../components/ToastNotification";
 
 function formatMoney(value) {
   const num = Number(value || 0);
@@ -34,7 +35,6 @@ function getStatusIcon(status) {
 
 export default function AdminProfitWithdrawalRequestsPage() {
   const token = localStorage.getItem("adminToken") || localStorage.getItem("admin_token") || "";
-  const { addToast, ToastContainer } = useToast();
   
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -47,8 +47,12 @@ export default function AdminProfitWithdrawalRequestsPage() {
       setRefreshing(true);
       const res = await adminApi.getProfitWithdrawalRequests(token);
       setRequests(Array.isArray(res.data?.data) ? res.data.data : []);
+      // ✅ ADDED: Toast notification for refresh success
+      addToast("Withdrawal requests refreshed", "success");
     } catch (err) {
-      addToast(getApiErrorMessage(err), "error");
+      const errorMsg = getApiErrorMessage(err);
+      // ✅ ADDED: Toast notification for error
+      addToast(errorMsg, "error");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -62,10 +66,14 @@ export default function AdminProfitWithdrawalRequestsPage() {
     try {
       setActionId(id);
       await adminApi.approveProfitWithdrawal(id, token);
-      addToast("Withdrawal approved successfully", "success");
+      const successMsg = "Withdrawal approved successfully";
+      // ✅ ADDED: Toast notification for approve success
+      addToast(successMsg, "success");
       await loadRequests();
     } catch (err) {
-      addToast(getApiErrorMessage(err), "error");
+      const errorMsg = getApiErrorMessage(err);
+      // ✅ ADDED: Toast notification for error
+      addToast(errorMsg, "error");
     } finally {
       setActionId(null);
     }
@@ -78,10 +86,14 @@ export default function AdminProfitWithdrawalRequestsPage() {
     try {
       setActionId(id);
       await adminApi.rejectProfitWithdrawal(id, token);
-      addToast("Withdrawal rejected", "info");
+      const successMsg = "Withdrawal rejected";
+      // ✅ ADDED: Toast notification for reject success
+      addToast(successMsg, "info");
       await loadRequests();
     } catch (err) {
-      addToast(getApiErrorMessage(err), "error");
+      const errorMsg = getApiErrorMessage(err);
+      // ✅ ADDED: Toast notification for error
+      addToast(errorMsg, "error");
     } finally {
       setActionId(null);
     }
@@ -112,6 +124,7 @@ export default function AdminProfitWithdrawalRequestsPage() {
   
   return (
     <div className="space-y-5">
+      {/* ✅ ADDED: Toast Container (already present, keeping it) */}
       <ToastContainer />
       
       <section className="rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(163,230,53,0.10),transparent_18%),linear-gradient(180deg,#0a0a0a_0%,#050505_100%)] p-5 shadow-xl">
