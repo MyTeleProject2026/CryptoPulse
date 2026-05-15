@@ -11,6 +11,7 @@ import {
   Activity,
   X,
   Flame,
+  Target,
 } from "lucide-react";
 import MarketChart from "../components/MarketChart";
 import {
@@ -20,6 +21,8 @@ import {
   getApiErrorMessage,
 } from "../services/api";
 import { useNotification } from "../hooks/useNotification";
+// ✅ ADDED: Import Target Modal
+import TargetModal from "../components/TargetModal";
 
 const DEFAULT_PAIRS = [
   "BTCUSDT",
@@ -148,7 +151,7 @@ function StatusPill({ value }) {
 
 function SmallStat({ label, value, valueClassName = "text-white", icon: Icon }) {
   return (
-    <div className="rounded-[22px] border border-white/10 bg-[#101010] px-3 py-3 shadow-[0_8px_30px_rgba(0,0,0,0.22)]">
+    <div className="rounded-[22px] border border-white/10 bg-[#0f0f0f] px-3 py-3 shadow-[0_8px_30px_rgba(0,0,0,0.22)]">
       <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-slate-500">
         {Icon ? <Icon size={12} /> : null}
         {label}
@@ -183,7 +186,7 @@ function TabButton({ active, onClick, children }) {
       className={`rounded-2xl px-3 py-2.5 text-sm font-semibold transition ${
         active
           ? "bg-lime-400 text-black"
-          : "bg-[#171717] text-slate-300 hover:bg-[#1d1d1d]"
+          : "bg-[#0f0f0f] text-slate-300 hover:bg-[#1a1a1a]"
       }`}
     >
       {children}
@@ -208,7 +211,7 @@ function CircularTimer({ remaining, total, direction }) {
   const radius = 84;
   const circumference = 2 * Math.PI * radius;
   const dashOffset = circumference * (1 - progress);
-  const ringColor = direction === "bullish" ? "#9FE026" : "#ef4444";
+  const ringColor = direction === "bullish" ? "#84cc16" : "#ef4444";
 
   return (
     <div className="relative mx-auto h-52 w-52">
@@ -289,8 +292,56 @@ export default function TradePage() {
     typeof window !== "undefined" ? window.innerWidth : 1440
   );
 
+  // ✅ ADDED: Target system states
+  const [hasTarget, setHasTarget] = useState(false);
+  const [showTargetModal, setShowTargetModal] = useState(false);
+  const [targetChecking, setTargetChecking] = useState(true);
+  const [userTarget, setUserTarget] = useState(null);
+  const [targetProgress, setTargetProgress] = useState({ currentProfit: 0, targetAmount: 0 });
+
   const lastPlacedTradeIdRef = useRef(null);
   const shownSettledTradeIdRef = useRef(null);
+
+  // ✅ ADDED: Check if user has set a target
+  async function checkUserTarget() {
+    try {
+      setTargetChecking(true);
+      const res = await userApi.getUserTarget(token);
+      if (res.data?.success && res.data.data.hasTarget) {
+        const targetData = res.data.data.target;
+        setHasTarget(true);
+        setUserTarget(targetData);
+        setTargetProgress({
+          currentProfit: Number(targetData.current_profit || 0),
+          targetAmount: Number(targetData.target_amount || 0),
+        });
+      } else {
+        setHasTarget(false);
+        setUserTarget(null);
+      }
+    } catch (err) {
+      console.error("Failed to check target:", err);
+      setHasTarget(false);
+    } finally {
+      setTargetChecking(false);
+    }
+  }
+
+  // ✅ ADDED: Refresh target progress after trades
+  async function refreshTargetProgress() {
+    try {
+      const res = await userApi.getUserTarget(token);
+      if (res.data?.success && res.data.data.hasTarget) {
+        const targetData = res.data.data.target;
+        setTargetProgress({
+          currentProfit: Number(targetData.current_profit || 0),
+          targetAmount: Number(targetData.target_amount || 0),
+        });
+      }
+    } catch (err) {
+      console.error("Failed to refresh target:", err);
+    }
+  }
 
   const marketMap = useMemo(() => {
     const map = {};
@@ -345,8 +396,15 @@ export default function TradePage() {
     return 420;
   }, [screenWidth]);
 
+  const targetProgressPercent = useMemo(() => {
+    if (targetProgress.targetAmount <= 0) return 0;
+    return (targetProgress.currentProfit / targetProgress.targetAmount) * 100;
+  }, [targetProgress]);
+
   useEffect(() => {
     loadTradePage();
+    // ✅ ADDED: Check target on page load
+    checkUserTarget();
   }, []);
 
   useEffect(() => {
@@ -398,6 +456,8 @@ export default function TradePage() {
 
     setShowRunningTradeModal(false);
     syncTradeState();
+    // ✅ ADDED: Refresh target progress after trade settles
+    refreshTargetProgress();
   }, [remainingSeconds, showRunningTradeModal]);
 
   useEffect(() => {
@@ -531,6 +591,8 @@ export default function TradePage() {
         if (settledTrade && shownSettledTradeIdRef.current !== settledTrade.id) {
           shownSettledTradeIdRef.current = settledTrade.id;
           setResultModal(settledTrade);
+          // ✅ ADDED: Refresh target progress when trade settles
+          refreshTargetProgress();
         }
       }
     } catch (_err) {
@@ -550,10 +612,16 @@ export default function TradePage() {
     }
   }
 
+  // ✅ ADDED: Modified handlePlaceTrade with target check
   async function handlePlaceTrade(e) {
     e.preventDefault();
     setError("");
     setSuccess("");
+
+    if (!hasTarget) {
+      setShowTargetModal(true);
+      return;
+    }
 
     if (!pair) {
       showError("Please select a trading pair");
@@ -649,10 +717,20 @@ export default function TradePage() {
     }
   }
 
+  // ✅ ADDED: Handle target set success
+  function handleTargetSet(targetAmount) {
+    setHasTarget(true);
+    setTargetProgress({
+      currentProfit: 0,
+      targetAmount: Number(targetAmount),
+    });
+    showSuccess(`Target set to ${targetAmount} USDT! You can now start trading.`);
+  }
+
   if (loading) {
     return (
       <div className="p-4 sm:p-6">
-        <div className="rounded-3xl border border-white/10 bg-[#111111] p-6 text-slate-300">
+        <div className="rounded-3xl border border-white/10 bg-[#0f0f0f] p-6 text-slate-300">
           Loading trading terminal...
         </div>
       </div>
@@ -672,6 +750,30 @@ export default function TradePage() {
 
   return (
     <div className="space-y-4 bg-black p-3 pb-24 sm:space-y-5 sm:p-6 xl:pb-6">
+      {/* ✅ ADDED: Target Progress Banner */}
+      {hasTarget && targetProgress.targetAmount > 0 && (
+        <div className="rounded-2xl border border-lime-500/20 bg-lime-500/10 p-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <Target size={16} className="text-lime-400" />
+              <span className="text-sm text-slate-300">Target Goal:</span>
+              <span className="text-sm font-semibold text-white">
+                {targetProgress.currentProfit.toFixed(2)} / {targetProgress.targetAmount.toFixed(2)} USDT
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-2 w-32 rounded-full bg-white/10 overflow-hidden">
+                <div 
+                  className="h-full bg-lime-400 rounded-full transition-all"
+                  style={{ width: `${Math.min(100, targetProgressPercent)}%` }}
+                />
+              </div>
+              <span className="text-xs text-lime-300">{targetProgressPercent.toFixed(1)}%</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       <section className="rounded-[32px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(163,230,53,0.10),transparent_18%),linear-gradient(180deg,#0a0a0a_0%,#050505_100%)] p-4 shadow-xl sm:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -696,7 +798,7 @@ export default function TradePage() {
             <SmallStat
               label="Status"
               value={refreshing ? "Refreshing..." : "Live"}
-              valueClassName={refreshing ? "text-cyan-300" : "text-emerald-300"}
+              valueClassName={refreshing ? "text-lime-300" : "text-emerald-300"}
               icon={Activity}
             />
           </div>
@@ -741,7 +843,7 @@ export default function TradePage() {
                   <select
                     value={pair}
                     onChange={(e) => setPair(e.target.value)}
-                    className="w-full appearance-none rounded-2xl border border-white/10 bg-[#171717] px-4 py-3 pr-10 text-sm text-white outline-none focus:border-lime-400 sm:w-[170px]"
+                    className="w-full appearance-none rounded-2xl border border-white/10 bg-[#0f0f0f] px-4 py-3 pr-10 text-sm text-white outline-none focus:border-lime-400 sm:w-[170px]"
                   >
                     {pairList.map((item) => (
                       <option key={item} value={item}>
@@ -755,7 +857,7 @@ export default function TradePage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-4 overflow-hidden rounded-2xl border border-white/10 bg-[#171717]">
+                <div className="grid grid-cols-4 overflow-hidden rounded-2xl border border-white/10 bg-[#0f0f0f]">
                   {["1m", "5m", "15m", "1h"].map((item) => (
                     <button
                       key={item}
@@ -867,7 +969,7 @@ export default function TradePage() {
                     className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${
                       direction === "bullish"
                         ? "bg-emerald-500/20 text-emerald-300"
-                        : "border border-white/10 bg-[#171717] text-slate-300"
+                        : "border border-white/10 bg-[#0f0f0f] text-slate-300"
                     }`}
                   >
                     <span className="inline-flex items-center gap-2">
@@ -882,7 +984,7 @@ export default function TradePage() {
                     className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${
                       direction === "bearish"
                         ? "bg-red-500/20 text-red-300"
-                        : "border border-white/10 bg-[#171717] text-slate-300"
+                        : "border border-white/10 bg-[#0f0f0f] text-slate-300"
                     }`}
                   >
                     <span className="inline-flex items-center gap-2">
@@ -903,7 +1005,7 @@ export default function TradePage() {
                         className={`rounded-2xl px-3 py-3 text-sm font-semibold transition ${
                           Number(timer) === item
                             ? "bg-lime-400 text-black"
-                            : "border border-white/10 bg-[#171717] text-slate-300"
+                            : "border border-white/10 bg-[#0f0f0f] text-slate-300"
                         }`}
                       >
                         {item}s
@@ -921,7 +1023,7 @@ export default function TradePage() {
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     placeholder="Enter amount"
-                    className="w-full rounded-2xl border border-white/10 bg-[#171717] px-4 py-3 text-white outline-none transition focus:border-lime-400"
+                    className="w-full rounded-2xl border border-white/10 bg-[#0f0f0f] px-4 py-3 text-white outline-none transition focus:border-lime-400"
                   />
                 </div>
 
@@ -931,7 +1033,7 @@ export default function TradePage() {
                       key={percent}
                       type="button"
                       onClick={() => handleQuickAmount(percent)}
-                      className="rounded-2xl border border-white/10 bg-[#171717] px-3 py-3 text-sm font-semibold text-slate-200 transition hover:bg-[#1e1e1e]"
+                      className="rounded-2xl border border-white/10 bg-[#0f0f0f] px-3 py-3 text-sm font-semibold text-slate-200 transition hover:bg-[#1a1a1a]"
                     >
                       {percent}%
                     </button>
@@ -1081,7 +1183,7 @@ export default function TradePage() {
 
       {showRunningTradeModal && runningTrade ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-0 sm:items-center sm:p-4">
-          <div className="w-full max-w-md rounded-t-[34px] border border-white/10 bg-[#0b1630] p-5 shadow-2xl sm:rounded-[34px]">
+          <div className="w-full max-w-md rounded-t-[34px] border border-white/10 bg-[#0f0f0f] p-5 shadow-2xl sm:rounded-[34px]">
             <div className="flex items-center justify-between border-b border-white/10 pb-4">
               <h3 className="text-[22px] font-bold text-white">{runningTrade.pair}</h3>
               <button
@@ -1121,7 +1223,7 @@ export default function TradePage() {
                 <TradeSlipRow
                   label="Expected Profit"
                   value={`+${formatAmount(runningTrade.expectedProfit)} USDT`}
-                  valueClassName="text-cyan-300"
+                  valueClassName="text-lime-300"
                 />
               </div>
 
@@ -1135,7 +1237,7 @@ export default function TradePage() {
 
       {resultModal ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-0 sm:items-center sm:p-4">
-          <div className="w-full max-w-md rounded-t-[34px] border border-white/10 bg-[#0b1630] p-5 shadow-2xl sm:rounded-[34px]">
+          <div className="w-full max-w-md rounded-t-[34px] border border-white/10 bg-[#0f0f0f] p-5 shadow-2xl sm:rounded-[34px]">
             <div className="flex items-center justify-between border-b border-white/10 pb-4">
               <h3 className="text-[22px] font-bold text-white">{resultModal.pair}</h3>
               <button
@@ -1185,6 +1287,14 @@ export default function TradePage() {
           </div>
         </div>
       ) : null}
+
+      {/* ✅ ADDED: Target Modal */}
+      <TargetModal
+        isOpen={showTargetModal}
+        onClose={() => setShowTargetModal(false)}
+        onTargetSet={handleTargetSet}
+        requiredFor="trade"
+      />
     </div>
   );
 }
