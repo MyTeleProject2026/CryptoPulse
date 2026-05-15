@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ShieldCheck, LockKeyhole, Mail, RefreshCw } from "lucide-react";
 import { adminApi } from "../../services/api";
+// ✅ ADDED: Import toast notification
+import { addToast, ToastContainer } from "../../components/ToastNotification";
 
 export default function AdminLoginPage() {
   const navigate = useNavigate();
@@ -27,7 +29,10 @@ export default function AdminLoginPage() {
     setError("");
 
     if (!form.email.trim() || !form.password.trim()) {
-      setError("Email and password are required");
+      const errorMsg = "Email and password are required";
+      setError(errorMsg);
+      // ✅ ADDED: Toast notification for validation error
+      addToast(errorMsg, "error");
       return;
     }
 
@@ -67,15 +72,19 @@ export default function AdminLoginPage() {
         localStorage.setItem("adminUser", JSON.stringify(admin));
       }
 
+      // ✅ ADDED: Toast notification for login success
+      addToast("Admin login successful! Redirecting...", "success");
       navigate("/admin/dashboard");
     } catch (err) {
       console.error("Admin login failed:", err);
 
-      setError(
+      const errorMsg =
         err?.response?.data?.message ||
-          err?.message ||
-          "Admin login failed"
-      );
+        err?.message ||
+        "Admin login failed";
+      setError(errorMsg);
+      // ✅ ADDED: Toast notification for login error
+      addToast(errorMsg, "error");
     } finally {
       setLoading(false);
     }
@@ -83,6 +92,9 @@ export default function AdminLoginPage() {
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_right,rgba(124,58,237,0.12),transparent_18%),linear-gradient(180deg,#05070d_0%,#02040a_100%)] px-4 py-8 text-white">
+      {/* ✅ ADDED: Toast Container */}
+      <ToastContainer />
+      
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-5xl items-center justify-center">
         <div className="grid w-full overflow-hidden rounded-[28px] border border-white/10 bg-slate-900/80 shadow-[0_20px_80px_rgba(0,0,0,0.45)] backdrop-blur xl:grid-cols-[1.05fr_0.95fr]">
           <section className="hidden border-r border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(34,197,94,0.08),transparent_18%),linear-gradient(180deg,#0b1120_0%,#050816_100%)] p-8 xl:flex xl:flex-col xl:justify-between">
