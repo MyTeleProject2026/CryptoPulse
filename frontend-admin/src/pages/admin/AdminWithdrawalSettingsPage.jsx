@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { RefreshCw, Save, TrendingUp } from "lucide-react";
 import { adminApi, getApiErrorMessage } from "../../services/api";
-import useToast from "../../components/ToastNotification";
+// ✅ FIXED: Import toast notification correctly (instead of useToast)
+import { addToast, ToastContainer } from "../../components/ToastNotification";
 
 export default function AdminWithdrawalSettingsPage() {
   const token = localStorage.getItem("adminToken") || localStorage.getItem("admin_token") || "";
-  const { addToast, ToastContainer } = useToast();
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -23,8 +23,12 @@ export default function AdminWithdrawalSettingsPage() {
       if (res.data?.success) {
         setSettings(res.data.data);
       }
+      // ✅ ADDED: Toast notification for load success
+      addToast("Withdrawal settings loaded", "success");
     } catch (err) {
-      addToast(getApiErrorMessage(err), "error");
+      const errorMsg = getApiErrorMessage(err);
+      // ✅ ADDED: Toast notification for error
+      addToast(errorMsg, "error");
     } finally {
       setLoading(false);
     }
@@ -34,9 +38,13 @@ export default function AdminWithdrawalSettingsPage() {
     try {
       setSaving(true);
       await adminApi.updateWithdrawalSettings(settings, token);
-      addToast("Withdrawal settings updated successfully", "success");
+      const successMsg = "Withdrawal settings updated successfully";
+      // ✅ ADDED: Toast notification for save success
+      addToast(successMsg, "success");
     } catch (err) {
-      addToast(getApiErrorMessage(err), "error");
+      const errorMsg = getApiErrorMessage(err);
+      // ✅ ADDED: Toast notification for error
+      addToast(errorMsg, "error");
     } finally {
       setSaving(false);
     }
@@ -52,6 +60,7 @@ export default function AdminWithdrawalSettingsPage() {
   
   return (
     <div className="space-y-5">
+      {/* ✅ ADDED: Toast Container (already present, keeping it) */}
       <ToastContainer />
       
       <section className="rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(163,230,53,0.10),transparent_18%),linear-gradient(180deg,#0a0a0a_0%,#050505_100%)] p-5 shadow-xl">
