@@ -3,6 +3,8 @@ import AdminTradesPage from "./AdminTradesPage";
 import AdminTradeRulesPage from "./AdminTradeRulesPage";
 import AdminFundsPage from "./AdminFundsPage";
 import AdminFundsRulesPage from "./AdminFundsRulesPage";
+// ✅ ADDED: Import toast notification
+import { ToastContainer } from "../../components/ToastNotification";
 
 function TabButton({ active, onClick, children }) {
   return (
@@ -25,6 +27,9 @@ export default function AdminTradingFundsControlPage() {
 
   return (
     <div className="space-y-5 bg-black text-white">
+      {/* ✅ ADDED: Toast Container */}
+      <ToastContainer />
+
       <section className="rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(163,230,53,0.10),transparent_18%),linear-gradient(180deg,#081223_0%,#050505_100%)] p-5 shadow-xl">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
