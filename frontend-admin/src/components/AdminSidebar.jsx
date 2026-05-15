@@ -42,6 +42,8 @@ const navItems = [
       { label: "Withdrawal Fees", to: "/admin/withdrawal-fees", icon: BadgeDollarSign },
       { label: "Loans", to: "/admin/loans", icon: Landmark },
       { label: "Loan Settings", to: "/admin/loan-settings", icon: HandCoins },
+      { label: "Withdrawal Settings", to: "/admin/withdrawal-settings", icon: Settings2 },
+      { label: "Profit Withdrawal Requests", to: "/admin/profit-withdrawal-requests", icon: DollarSign },
     ],
   },
   { label: "Trading Control", to: "/admin/trading-funds-control", icon: CandlestickChart },
