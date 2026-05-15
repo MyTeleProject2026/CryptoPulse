@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { adminApi, getApiErrorMessage } from "../../services/api";
+// ✅ ADDED: Import toast notification
+import { addToast, ToastContainer } from "../../components/ToastNotification";
 
 function formatMoney(value) {
   const num = Number(value || 0);
@@ -96,8 +98,16 @@ export default function AdminFundsPage() {
 
       setFunds(Array.isArray(fundsRes.data?.data) ? fundsRes.data.data : []);
       setSummary(summaryRes.data?.data || {});
+      
+      // ✅ ADDED: Toast notification for silent refresh
+      if (!isInitial) {
+        addToast("Funds refreshed successfully", "success");
+      }
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      const errorMsg = getApiErrorMessage(err);
+      setError(errorMsg);
+      // ✅ ADDED: Toast notification for error
+      addToast(errorMsg, "error");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -114,10 +124,15 @@ export default function AdminFundsPage() {
       setSuccess("");
 
       await adminApi.deleteFund(id, token);
-      setSuccess(`Fund #${id} deleted successfully.`);
+      const successMsg = `Fund #${id} deleted successfully.`;
+      setSuccess(successMsg);
+      // ✅ ADDED: Toast notification for delete success
+      addToast(successMsg, "success");
       await loadFunds(false);
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      const errorMsg = getApiErrorMessage(err);
+      setError(errorMsg);
+      addToast(errorMsg, "error");
     } finally {
       setActionId(null);
     }
@@ -133,10 +148,15 @@ export default function AdminFundsPage() {
       setSuccess("");
 
       await adminApi.completeFund(id, {}, token);
-      setSuccess(`Fund #${id} completed successfully.`);
+      const successMsg = `Fund #${id} completed successfully.`;
+      setSuccess(successMsg);
+      // ✅ ADDED: Toast notification for complete success
+      addToast(successMsg, "success");
       await loadFunds(false);
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      const errorMsg = getApiErrorMessage(err);
+      setError(errorMsg);
+      addToast(errorMsg, "error");
     } finally {
       setActionId(null);
     }
@@ -152,10 +172,15 @@ export default function AdminFundsPage() {
       setSuccess("");
 
       await adminApi.cancelFund(id, {}, token);
-      setSuccess(`Fund #${id} cancelled successfully.`);
+      const successMsg = `Fund #${id} cancelled successfully.`;
+      setSuccess(successMsg);
+      // ✅ ADDED: Toast notification for cancel success
+      addToast(successMsg, "success");
       await loadFunds(false);
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      const errorMsg = getApiErrorMessage(err);
+      setError(errorMsg);
+      addToast(errorMsg, "error");
     } finally {
       setActionId(null);
     }
@@ -185,6 +210,9 @@ export default function AdminFundsPage() {
 
   return (
     <div className="space-y-5">
+      {/* ✅ ADDED: Toast Container */}
+      <ToastContainer />
+
       <section className="rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(163,230,53,0.10),transparent_18%),linear-gradient(180deg,#081223_0%,#020617_100%)] p-5 shadow-xl">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
