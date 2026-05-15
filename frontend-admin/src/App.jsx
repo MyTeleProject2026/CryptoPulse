@@ -22,6 +22,8 @@ import AdminTradingFundsControlPage from "./pages/admin/AdminTradingFundsControl
 import AdminJointAccountRequests from "./pages/admin/AdminJointAccountRequests";
 import AdminJointAccountsPage from "./pages/admin/AdminJointAccountsPage";
 import AdminLayout from "./layouts/AdminLayout";
+import AdminWithdrawalSettingsPage from "./pages/admin/AdminWithdrawalSettingsPage";
+import AdminProfitWithdrawalRequestsPage from "./pages/admin/AdminProfitWithdrawalRequestsPage";
 
 function PrivateRoute({ children }) {
   const token =
@@ -62,6 +64,9 @@ export default function App() {
         />
         <Route path="trades" element={<AdminTradesPage />} />
         <Route path="trade-rules" element={<AdminTradeRulesPage />} />
+
+        <Route path="withdrawal-settings" element={<AdminWithdrawalSettingsPage />} />
+        <Route path="profit-withdrawal-requests" element={<AdminProfitWithdrawalRequestsPage />} />
 
         <Route
           path="trading-funds-control"
