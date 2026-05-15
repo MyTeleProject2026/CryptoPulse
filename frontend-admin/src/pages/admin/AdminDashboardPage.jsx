@@ -12,9 +12,11 @@ import {
   XCircle,
   Clock3,
   Eye,
-  CandlestickChart,  // ← ADDED
+  CandlestickChart,
 } from "lucide-react";
 import { adminApi, getApiErrorMessage } from "../../services/api";
+// ✅ ADDED: Import toast notification
+import { addToast, ToastContainer } from "../../components/ToastNotification";
 
 function formatMoney(value) {
   const num = Number(value || 0);
@@ -141,6 +143,8 @@ export default function AdminDashboardPage() {
     todayTrades: 0,
     totalBalance: 0,
     pendingLoans: 0,
+    emailVerifiedUsers: 0,
+    pendingJointAccounts: 0,
   });
 
   const [notifications, setNotifications] = useState([]);
@@ -168,8 +172,16 @@ export default function AdminDashboardPage() {
 
       const res = await adminApi.getDashboardStats(token);
       setStats(res.data?.data || {});
+      
+      // ✅ ADDED: Toast notification for silent refresh
+      if (silent) {
+        addToast("Dashboard refreshed", "success");
+      }
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      const errorMsg = getApiErrorMessage(err);
+      setError(errorMsg);
+      // ✅ ADDED: Toast notification for error
+      addToast(errorMsg, "error");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -189,8 +201,11 @@ export default function AdminDashboardPage() {
     try {
       await adminApi.markNotificationRead?.(id, token);
       await loadNotifications(true);
+      // ✅ ADDED: Toast notification for marking read
+      addToast("Notification marked as read", "info");
     } catch (err) {
       console.error("Failed to mark notification as read:", err);
+      addToast(getApiErrorMessage(err), "error");
     }
   }
 
@@ -212,6 +227,9 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="space-y-5 pb-20 xl:pb-5">
+      {/* ✅ ADDED: Toast Container */}
+      <ToastContainer />
+
       <section className="rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(34,197,94,0.10),transparent_18%),linear-gradient(180deg,#111827_0%,#020617_100%)] p-5 shadow-xl">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
