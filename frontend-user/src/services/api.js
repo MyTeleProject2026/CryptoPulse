@@ -113,6 +113,21 @@ export const userApi = {
 
   deleteNotification: (id, token) =>
     api.delete(`/api/user/notifications/${id}`, authHeaders(token)),
+  // Add inside your existing userApi object
+getUserTarget: (token) =>
+  api.get("/api/user/target", authHeaders(token)),
+
+setUserTarget: (payload, token) =>
+  api.post("/api/user/target/set", payload, authHeaders(token)),
+
+updateTargetProfit: (payload, token) =>
+  api.post("/api/user/target/update-profit", payload, authHeaders(token)),
+
+getWithdrawalSettings: () =>
+  api.get("/api/withdrawal-settings"),
+
+requestProfitWithdrawal: (payload, token) =>
+  api.post("/api/withdraw/profit-request", payload, authHeaders(token)),
 
   uploadProfilePicture: (file, token) => {
     const formData = new FormData();
