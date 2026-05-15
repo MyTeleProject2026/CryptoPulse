@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { adminApi, getApiErrorMessage } from "../../services/api";
+// ✅ ADDED: Import toast notification
+import { addToast, ToastContainer } from "../../components/ToastNotification";
 
 function StatCard({ title, value, tone = "text-white" }) {
   return (
@@ -63,8 +65,16 @@ export default function AdminFundsRulesPage() {
 
       const res = await adminApi.getFundRules(token);
       setRules(Array.isArray(res.data?.data) ? res.data.data : []);
+      
+      // ✅ ADDED: Toast notification for silent refresh
+      if (!isInitial) {
+        addToast("Fund rules refreshed successfully", "success");
+      }
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      const errorMsg = getApiErrorMessage(err);
+      setError(errorMsg);
+      // ✅ ADDED: Toast notification for error
+      addToast(errorMsg, "error");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -111,16 +121,36 @@ export default function AdminFundsRulesPage() {
         token
       );
 
-      setSuccess(`${rule.name} updated successfully.`);
+      const successMsg = `${rule.name} updated successfully.`;
+      setSuccess(successMsg);
+      // ✅ ADDED: Toast notification for save success
+      addToast(successMsg, "success");
       await loadRules(false);
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      const errorMsg = getApiErrorMessage(err);
+      setError(errorMsg);
+      addToast(errorMsg, "error");
     } finally {
       setSavingId(null);
     }
   }
 
   async function handleCreateRule() {
+    // ✅ ADDED: Validation with toast
+    if (!createForm.name || !createForm.name.trim()) {
+      const errorMsg = "Rule name is required";
+      setError(errorMsg);
+      addToast(errorMsg, "error");
+      return;
+    }
+
+    if (!createForm.duration_days || createForm.duration_days <= 0) {
+      const errorMsg = "Duration days must be greater than 0";
+      setError(errorMsg);
+      addToast(errorMsg, "error");
+      return;
+    }
+
     try {
       setCreating(true);
       setError("");
@@ -144,11 +174,16 @@ export default function AdminFundsRulesPage() {
         token
       );
 
-      setSuccess("Fund rule created successfully.");
+      const successMsg = "Fund rule created successfully.";
+      setSuccess(successMsg);
+      // ✅ ADDED: Toast notification for create success
+      addToast(successMsg, "success");
       setCreateForm(EMPTY_FORM);
       await loadRules(false);
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      const errorMsg = getApiErrorMessage(err);
+      setError(errorMsg);
+      addToast(errorMsg, "error");
     } finally {
       setCreating(false);
     }
@@ -164,10 +199,15 @@ export default function AdminFundsRulesPage() {
       setSuccess("");
 
       await adminApi.deleteFundRule(id, token);
-      setSuccess(`Fund rule #${id} deleted successfully.`);
+      const successMsg = `Fund rule #${id} deleted successfully.`;
+      setSuccess(successMsg);
+      // ✅ ADDED: Toast notification for delete success
+      addToast(successMsg, "success");
       await loadRules(false);
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      const errorMsg = getApiErrorMessage(err);
+      setError(errorMsg);
+      addToast(errorMsg, "error");
     } finally {
       setSavingId(null);
     }
@@ -199,6 +239,9 @@ export default function AdminFundsRulesPage() {
 
   return (
     <div className="space-y-5">
+      {/* ✅ ADDED: Toast Container */}
+      <ToastContainer />
+
       <section className="rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(163,230,53,0.10),transparent_18%),linear-gradient(180deg,#081223_0%,#020617_100%)] p-5 shadow-xl">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
