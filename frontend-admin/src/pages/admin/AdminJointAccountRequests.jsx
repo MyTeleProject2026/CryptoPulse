@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { RefreshCw, CheckCircle, XCircle, Users } from "lucide-react";
 import { adminApi, getApiErrorMessage } from "../../services/api";
+// ✅ ADDED: Import toast notification
+import { addToast, ToastContainer } from "../../components/ToastNotification";
 
 function formatDate(value) {
   if (!value) return "-";
@@ -25,8 +27,14 @@ export default function AdminJointAccountRequests() {
       setError("");
       const res = await adminApi.getJointAccountRequests(token);
       setRequests(Array.isArray(res.data?.data) ? res.data.data : []);
+      
+      // ✅ ADDED: Toast notification for silent refresh
+      addToast("Joint account requests refreshed", "success");
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      const errorMsg = getApiErrorMessage(err);
+      setError(errorMsg);
+      // ✅ ADDED: Toast notification for error
+      addToast(errorMsg, "error");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -42,11 +50,16 @@ export default function AdminJointAccountRequests() {
       setProcessingId(id);
       setError("");
       await adminApi.approveJointAccountRequest(id, {}, token);
-      setSuccess("Joint account approved successfully!");
+      const successMsg = "Joint account approved successfully!";
+      setSuccess(successMsg);
+      // ✅ ADDED: Toast notification for approve success
+      addToast(successMsg, "success");
       await loadRequests();
       setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      const errorMsg = getApiErrorMessage(err);
+      setError(errorMsg);
+      addToast(errorMsg, "error");
     } finally {
       setProcessingId(null);
     }
@@ -57,11 +70,16 @@ export default function AdminJointAccountRequests() {
       setProcessingId(id);
       setError("");
       await adminApi.rejectJointAccountRequest(id, {}, token);
-      setSuccess("Joint account request rejected.");
+      const successMsg = "Joint account request rejected.";
+      setSuccess(successMsg);
+      // ✅ ADDED: Toast notification for reject success
+      addToast(successMsg, "success");
       await loadRequests();
       setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      const errorMsg = getApiErrorMessage(err);
+      setError(errorMsg);
+      addToast(errorMsg, "error");
     } finally {
       setProcessingId(null);
     }
@@ -77,6 +95,9 @@ export default function AdminJointAccountRequests() {
 
   return (
     <div className="space-y-6">
+      {/* ✅ ADDED: Toast Container */}
+      <ToastContainer />
+
       <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-slate-900/80 to-slate-950/80 p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -126,7 +147,7 @@ export default function AdminJointAccountRequests() {
                 <tr>
                   <td colSpan="5" className="px-5 py-10 text-center text-slate-500">
                     No pending joint account requests.
-                  </td>
+                   </td>
                 </tr>
               ) : (
                 requests.map((req) => (
@@ -134,14 +155,14 @@ export default function AdminJointAccountRequests() {
                     <td className="px-5 py-4">
                       <div className="font-semibold text-white">{req.requester_email}</div>
                       <div className="text-xs text-slate-500">UID: {req.requester_uid}</div>
-                    </td>
+                     </td>
                     <td className="px-5 py-4">
                       <div className="font-semibold text-white">{req.partner_email}</div>
                       <div className="text-xs text-slate-500">UID: {req.partner_uid}</div>
-                    </td>
+                     </td>
                     <td className="px-5 py-4">
                       {req.partner_kyc_number || <span className="text-slate-500">Not provided</span>}
-                    </td>
+                     </td>
                     <td className="px-5 py-4 text-slate-400">{formatDate(req.created_at)}</td>
                     <td className="px-5 py-4 text-right">
                       <div className="flex justify-end gap-2">
@@ -162,12 +183,12 @@ export default function AdminJointAccountRequests() {
                           Reject
                         </button>
                       </div>
-                    </td>
-                  </tr>
+                     </td>
+                   </tr>
                 ))
               )}
             </tbody>
-          </table>
+           </table>
         </div>
       </div>
     </div>
