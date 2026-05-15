@@ -156,6 +156,22 @@ export const adminApi = {
       },
     }),
 
+  // Add inside your existing adminApi object
+getWithdrawalSettings: (token) =>
+  api.get("/api/withdrawal-settings", authHeaders(token)),
+
+updateWithdrawalSettings: (payload, token) =>
+  api.put("/api/admin/withdrawal-settings", payload, authHeaders(token)),
+
+getProfitWithdrawalRequests: (token) =>
+  api.get("/api/admin/profit-withdrawal-requests", authHeaders(token)),
+
+approveProfitWithdrawal: (id, token) =>
+  api.post(`/api/admin/profit-withdrawal-requests/${id}/approve`, {}, authHeaders(token)),
+
+rejectProfitWithdrawal: (id, token) =>
+  api.post(`/api/admin/profit-withdrawal-requests/${id}/reject`, {}, authHeaders(token)),
+
   /* ---------------- WITHDRAWALS ---------------- */
   getWithdrawals: (token) =>
     api.get("/api/admin/withdrawals", authHeaders(token)),
