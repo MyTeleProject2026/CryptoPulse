@@ -8,10 +8,15 @@ import {
   CheckCircle2,
   ChevronRight,
   X,
+  Target,
 } from "lucide-react";
 import { getApiErrorMessage } from "../services/api";
 import api from "../services/api";
 import { useNotification } from "../hooks/useNotification";
+// ✅ ADDED: Import Target Modal
+import TargetModal from "../components/TargetModal";
+// ✅ ADDED: Import Profit Withdrawal Modal
+import ProfitWithdrawalModal from "../components/ProfitWithdrawalModal";
 
 function formatMoney(value) {
   const num = Number(value || 0);
@@ -63,7 +68,7 @@ function StatusPill({ status }) {
 
 function SummaryCard({ label, value, subtext, icon: Icon, tone = "text-white" }) {
   return (
-    <div className="rounded-[24px] border border-white/10 bg-[#121212] p-3 shadow-[0_10px_30px_rgba(0,0,0,0.22)]">
+    <div className="rounded-[24px] border border-white/10 bg-[#0f0f0f] p-3 shadow-[0_10px_30px_rgba(0,0,0,0.22)]">
       <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.04] text-slate-300">
           <Icon size={18} />
@@ -89,7 +94,7 @@ function PlanCard({ plan, applying, onApply }) {
       : `${plan.user_limit_count} times`;
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-[#111111] p-3 shadow-[0_12px_36px_rgba(0,0,0,0.25)]">
+    <div className="rounded-2xl border border-white/10 bg-[#0f0f0f] p-3 shadow-[0_12px_36px_rgba(0,0,0,0.25)]">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-base font-semibold text-white">{plan.name}</div>
@@ -149,7 +154,7 @@ function ActiveFundCard({ item }) {
     Number(item.locked_principal || 0) + Number(item.earned_profit || 0);
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-[#111111] p-3 shadow-[0_12px_36px_rgba(0,0,0,0.25)]">
+    <div className="rounded-2xl border border-white/10 bg-[#0f0f0f] p-3 shadow-[0_12px_36px_rgba(0,0,0,0.25)]">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-base font-semibold text-white">
@@ -216,7 +221,7 @@ function HistoryFundCard({ item }) {
     (Number(item.locked_principal || 0) + Number(item.earned_profit || 0));
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-[#111111] p-3">
+    <div className="rounded-2xl border border-white/10 bg-[#0f0f0f] p-3">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-base font-semibold text-white">
@@ -298,6 +303,82 @@ export default function FundsPage() {
   const [applyAmount, setApplyAmount] = useState("");
   const [selectedPlanId, setSelectedPlanId] = useState(null);
 
+  // ✅ ADDED: Target system states
+  const [hasTarget, setHasTarget] = useState(false);
+  const [showTargetModal, setShowTargetModal] = useState(false);
+  const [targetChecking, setTargetChecking] = useState(true);
+  const [userTarget, setUserTarget] = useState(null);
+  const [targetProgress, setTargetProgress] = useState({ currentProfit: 0, targetAmount: 0 });
+
+  // ✅ ADDED: Profit withdrawal modal
+  const [showProfitWithdrawalModal, setShowProfitWithdrawalModal] = useState(false);
+  const [profitWithdrawalProfit, setProfitWithdrawalProfit] = useState(0);
+  const [profitWithdrawalTarget, setProfitWithdrawalTarget] = useState(0);
+
+  // ✅ ADDED: Check if user has set a target
+  async function checkUserTarget() {
+    try {
+      setTargetChecking(true);
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || "https://cryptopulse-4rhe.onrender.com"}/api/user/target`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success && data.data.hasTarget) {
+        const targetData = data.data.target;
+        setHasTarget(true);
+        setUserTarget(targetData);
+        setTargetProgress({
+          currentProfit: Number(targetData.current_profit || 0),
+          targetAmount: Number(targetData.target_amount || 0),
+        });
+      } else {
+        setHasTarget(false);
+        setUserTarget(null);
+      }
+    } catch (err) {
+      console.error("Failed to check target:", err);
+      setHasTarget(false);
+    } finally {
+      setTargetChecking(false);
+    }
+  }
+
+  // ✅ ADDED: Refresh target progress
+  async function refreshTargetProgress() {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || "https://cryptopulse-4rhe.onrender.com"}/api/user/target`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success && data.data.hasTarget) {
+        const targetData = data.data.target;
+        setTargetProgress({
+          currentProfit: Number(targetData.current_profit || 0),
+          targetAmount: Number(targetData.target_amount || 0),
+        });
+      }
+    } catch (err) {
+      console.error("Failed to refresh target:", err);
+    }
+  }
+
+  // ✅ ADDED: Handle target set success
+  function handleTargetSet(targetAmount) {
+    setHasTarget(true);
+    setTargetProgress({
+      currentProfit: 0,
+      targetAmount: Number(targetAmount),
+    });
+    showSuccess(`Target set to ${targetAmount} USDT! You can now start funding.`);
+  }
+
+  // ✅ ADDED: Handle profit withdrawal from completed fund profits
+  function handleWithdrawFromProfit(profitAmount, targetAmount) {
+    setProfitWithdrawalProfit(profitAmount);
+    setProfitWithdrawalTarget(targetAmount);
+    setShowProfitWithdrawalModal(true);
+  }
+
   async function loadData(silent = false) {
     try {
       if (!silent) setLoading(true);
@@ -356,9 +437,13 @@ export default function FundsPage() {
 
   useEffect(() => {
     loadData();
+    // ✅ ADDED: Check target on page load
+    checkUserTarget();
 
     const interval = setInterval(() => {
       loadData(true);
+      // ✅ ADDED: Refresh target progress periodically
+      refreshTargetProgress();
     }, 15000);
 
     return () => clearInterval(interval);
@@ -384,7 +469,17 @@ export default function FundsPage() {
     }, 0);
   }, [activeFunds]);
 
+  const targetProgressPercent = useMemo(() => {
+    if (targetProgress.targetAmount <= 0) return 0;
+    return (targetProgress.currentProfit / targetProgress.targetAmount) * 100;
+  }, [targetProgress]);
+
   function openApplyModal(plan) {
+    // ✅ ADDED: Check if user has target before applying
+    if (!hasTarget) {
+      setShowTargetModal(true);
+      return;
+    }
     setApplyModal(plan);
     setApplyAmount("");
     setError("");
@@ -453,7 +548,7 @@ export default function FundsPage() {
   if (loading) {
     return (
       <div className="space-y-5 bg-black p-3 sm:p-5">
-        <section className="rounded-[28px] border border-white/10 bg-[#111111] p-5 text-sm text-slate-300 shadow-2xl">
+        <section className="rounded-[28px] border border-white/10 bg-[#0f0f0f] p-5 text-sm text-slate-300 shadow-2xl">
           Loading funds...
         </section>
       </div>
@@ -462,6 +557,30 @@ export default function FundsPage() {
 
   return (
     <div className="space-y-5 bg-black px-3 pb-24 pt-3 sm:px-5 xl:pb-8">
+      {/* ✅ ADDED: Target Progress Banner */}
+      {hasTarget && targetProgress.targetAmount > 0 && (
+        <div className="rounded-2xl border border-lime-500/20 bg-lime-500/10 p-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <Target size={16} className="text-lime-400" />
+              <span className="text-sm text-slate-300">Funding Target Goal:</span>
+              <span className="text-sm font-semibold text-white">
+                {targetProgress.currentProfit.toFixed(2)} / {targetProgress.targetAmount.toFixed(2)} USDT
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-2 w-32 rounded-full bg-white/10 overflow-hidden">
+                <div 
+                  className="h-full bg-lime-400 rounded-full transition-all"
+                  style={{ width: `${Math.min(100, targetProgressPercent)}%` }}
+                />
+              </div>
+              <span className="text-xs text-lime-300">{targetProgressPercent.toFixed(1)}%</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       <section className="rounded-[32px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(163,230,53,0.10),transparent_18%),linear-gradient(180deg,#0a0a0a_0%,#050505_100%)] p-4 shadow-xl sm:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -507,7 +626,7 @@ export default function FundsPage() {
           value={`+${formatMoney(summary.today_profit)} USDT`}
           subtext="Credited today"
           icon={Clock3}
-          tone="text-cyan-300"
+          tone="text-lime-300"
         />
         <SummaryCard
           label="Completed Profit"
@@ -518,7 +637,7 @@ export default function FundsPage() {
         />
       </section>
 
-      <section className="rounded-[28px] border border-white/10 bg-[#111111] p-2">
+      <section className="rounded-[28px] border border-white/10 bg-[#0f0f0f] p-2">
         <div className="grid grid-cols-3 gap-2">
           {[
             ["plans", "Plans"],
@@ -532,7 +651,7 @@ export default function FundsPage() {
               className={`rounded-2xl px-3 py-3 text-sm font-semibold transition ${
                 tab === key
                   ? "bg-lime-400 text-black"
-                  : "bg-[#171717] text-slate-300 hover:bg-[#1d1d1d]"
+                  : "bg-[#0f0f0f] text-slate-300 hover:bg-[#1a1a1a]"
               }`}
             >
               {label}
@@ -550,7 +669,7 @@ export default function FundsPage() {
             </div>
           </div>
 
-          <div className="rounded-[24px] border border-white/10 bg-[#111111] p-3">
+          <div className="rounded-[24px] border border-white/10 bg-[#0f0f0f] p-3">
             <div className="flex gap-2 overflow-x-auto pb-1">
               {plans.map((plan) => {
                 const active = selectedPlanId === plan.id;
@@ -562,7 +681,7 @@ export default function FundsPage() {
                     className={`shrink-0 rounded-2xl px-4 py-3 text-sm font-semibold transition ${
                       active
                         ? "bg-lime-400 text-black"
-                        : "bg-[#171717] text-slate-300 hover:bg-[#1d1d1d]"
+                        : "bg-[#0f0f0f] text-slate-300 hover:bg-[#1a1a1a]"
                     }`}
                   >
                     {plan.duration_days} Day
@@ -573,7 +692,7 @@ export default function FundsPage() {
           </div>
 
           {selectedPlan ? (
-            <div className="rounded-2xl border border-white/10 bg-[#111111] p-3 shadow-[0_12px_36px_rgba(0,0,0,0.25)]">
+            <div className="rounded-2xl border border-white/10 bg-[#0f0f0f] p-3 shadow-[0_12px_36px_rgba(0,0,0,0.25)]">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-base font-semibold text-white">{selectedPlan.name}</div>
@@ -654,7 +773,7 @@ export default function FundsPage() {
               ))}
             </div>
           ) : (
-            <div className="rounded-2xl border border-white/10 bg-[#111111] px-4 py-10 text-center text-sm text-slate-400">
+            <div className="rounded-2xl border border-white/10 bg-[#0f0f0f] px-4 py-10 text-center text-sm text-slate-400">
               No active funds right now.
             </div>
           )}
@@ -685,7 +804,7 @@ export default function FundsPage() {
               ))}
             </div>
           ) : (
-            <div className="rounded-2xl border border-white/10 bg-[#111111] px-4 py-10 text-center text-sm text-slate-400">
+            <div className="rounded-2xl border border-white/10 bg-[#0f0f0f] px-4 py-10 text-center text-sm text-slate-400">
               No funds history yet.
             </div>
           )}
@@ -694,7 +813,7 @@ export default function FundsPage() {
 
       {applyModal ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-0 sm:items-center sm:p-4">
-          <div className="w-full max-w-md rounded-t-[34px] border border-white/10 bg-[#0b1630] p-5 shadow-2xl sm:rounded-[34px]">
+          <div className="w-full max-w-md rounded-t-[34px] border border-white/10 bg-[#0f0f0f] p-5 shadow-2xl sm:rounded-[34px]">
             <div className="flex items-center justify-between border-b border-white/10 pb-4">
               <div>
                 <div className="text-[22px] font-bold text-white">{applyModal.name}</div>
@@ -748,7 +867,7 @@ export default function FundsPage() {
                   value={applyAmount}
                   onChange={(e) => setApplyAmount(e.target.value)}
                   placeholder="Enter amount"
-                  className="w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none focus:border-lime-400"
+                  className="w-full rounded-2xl border border-white/10 bg-[#0f0f0f] px-4 py-3 text-white outline-none focus:border-lime-400"
                 />
               </div>
 
@@ -777,7 +896,7 @@ export default function FundsPage() {
 
       {latestCompleted && latestCompleted.__show ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-0 sm:items-center sm:p-4">
-          <div className="w-full max-w-md rounded-t-[34px] border border-white/10 bg-[#0b1630] p-5 shadow-2xl sm:rounded-[34px]">
+          <div className="w-full max-w-md rounded-t-[34px] border border-white/10 bg-[#0f0f0f] p-5 shadow-2xl sm:rounded-[34px]">
             <div className="flex items-center justify-between border-b border-white/10 pb-4">
               <div>
                 <div className="text-[22px] font-bold text-white">Fund Complete</div>
@@ -828,6 +947,23 @@ export default function FundsPage() {
                 />
               </div>
 
+              {/* ✅ ADDED: Withdraw from profit button */}
+              {latestCompleted.earned_profit > 0 && !hasTarget && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLatestCompleted((prev) => ({ ...prev, __show: false }));
+                    handleWithdrawFromProfit(
+                      Number(latestCompleted.earned_profit),
+                      targetProgress.targetAmount
+                    );
+                  }}
+                  className="mt-4 w-full rounded-xl bg-lime-400 py-2 text-sm font-semibold text-black hover:bg-lime-300"
+                >
+                  Withdraw ${formatMoney(latestCompleted.earned_profit)} from Profit
+                </button>
+              )}
+
               <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-200">
                 Principal and profits have been returned to the user main wallet.
               </div>
@@ -835,6 +971,26 @@ export default function FundsPage() {
           </div>
         </div>
       ) : null}
+
+      {/* ✅ ADDED: Target Modal */}
+      <TargetModal
+        isOpen={showTargetModal}
+        onClose={() => setShowTargetModal(false)}
+        onTargetSet={handleTargetSet}
+        requiredFor="funds"
+      />
+
+      {/* ✅ ADDED: Profit Withdrawal Modal */}
+      <ProfitWithdrawalModal
+        isOpen={showProfitWithdrawalModal}
+        onClose={() => setShowProfitWithdrawalModal(false)}
+        onSuccess={() => {
+          refreshTargetProgress();
+          loadData(true);
+        }}
+        currentProfit={profitWithdrawalProfit}
+        targetAmount={profitWithdrawalTarget}
+      />
     </div>
   );
 }
