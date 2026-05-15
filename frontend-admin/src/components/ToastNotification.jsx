@@ -1,9 +1,47 @@
-import { useState, useEffect } from "react";
+// frontend-admin/src/components/ToastNotification.jsx
+import { useState, useEffect, createContext, useContext, useCallback } from "react";
 import { X, CheckCircle, AlertCircle, Info, AlertTriangle } from "lucide-react";
 
 const TOAST_DURATION = 5000;
 
-function Toast({ toast, onClose }) {
+// Toast Context
+const ToastContext = createContext(null);
+
+export function ToastProvider({ children }) {
+  const [toasts, setToasts] = useState([]);
+
+  const addToast = useCallback((message, type = "info") => {
+    const id = Date.now();
+    setToasts((prev) => [...prev, { id, message, type }]);
+    
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((toast) => toast.id !== id));
+    }, TOAST_DURATION);
+    
+    return id;
+  }, []);
+
+  const removeToast = useCallback((id) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  }, []);
+
+  return (
+    <ToastContext.Provider value={{ addToast, removeToast, toasts }}>
+      {children}
+    </ToastContext.Provider>
+  );
+}
+
+export function useToast() {
+  const context = useContext(ToastContext);
+  if (!context) {
+    throw new Error("useToast must be used within ToastProvider");
+  }
+  return context;
+}
+
+// Individual Toast Component
+function ToastItem({ toast, onClose }) {
   useEffect(() => {
     const timer = setTimeout(() => {
       onClose();
@@ -26,17 +64,18 @@ function Toast({ toast, onClose }) {
   };
 
   return (
-    <div className={`flex items-center gap-3 rounded-xl border p-3 shadow-lg ${bgColors[toast.type]}`}>
+    <div className={`flex items-center gap-3 rounded-xl border p-3 shadow-lg animate-slide-in ${bgColors[toast.type]}`}>
       {icons[toast.type]}
       <span className="text-sm text-white">{toast.message}</span>
-      <button onClick={onClose} className="ml-2 text-slate-400 hover:text-white">
+      <button onClick={onClose} className="ml-2 text-slate-400 hover:text-white transition-colors">
         <X size={14} />
       </button>
     </div>
   );
 }
 
-export default function ToastContainer() {
+// Toast Container Component
+export function ToastContainer() {
   const { toasts, removeToast } = useToast();
 
   if (toasts.length === 0) return null;
@@ -44,56 +83,21 @@ export default function ToastContainer() {
   return (
     <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
       {toasts.map((toast) => (
-        <Toast key={toast.id} toast={toast} onClose={() => removeToast(toast.id)} />
+        <ToastItem key={toast.id} toast={toast} onClose={() => removeToast(toast.id)} />
       ))}
     </div>
   );
 }
 
-// Toast Hook
-let toastId = 0;
-const listeners = new Set();
-let toasts = [];
-
-function notifyListeners() {
-  listeners.forEach((listener) => listener([...toasts]));
+// Simple standalone functions for non-React usage (optional)
+let globalAddToast = null;
+export function setGlobalToastHandler(handler) {
+  globalAddToast = handler;
 }
-
 export function addToast(message, type = "info") {
-  const id = ++toastId;
-  toasts.push({ id, message, type });
-  notifyListeners();
-
-  setTimeout(() => {
-    removeToast(id);
-  }, TOAST_DURATION);
-
-  return id;
-}
-
-export function removeToast(id) {
-  toasts = toasts.filter((t) => t.id !== id);
-  notifyListeners();
-}
-
-export function useToast() {
-  const [localToasts, setLocalToasts] = useState([]);
-
-  useEffect(() => {
-    const listener = (newToasts) => {
-      setLocalToasts(newToasts);
-    };
-    listeners.add(listener);
-
-    return () => {
-      listeners.delete(listener);
-    };
-  }, []);
-
-  return {
-    toasts: localToasts,
-    addToast,
-    removeToast,
-    ToastContainer,
-  };
+  if (globalAddToast) {
+    globalAddToast(message, type);
+  } else {
+    console.warn("Toast not initialized. Wrap your app in ToastProvider");
+  }
 }
