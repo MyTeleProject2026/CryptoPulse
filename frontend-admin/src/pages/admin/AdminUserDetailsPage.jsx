@@ -17,6 +17,8 @@ import {
   Trash2,
 } from "lucide-react";
 import { adminApi, getApiErrorMessage } from "../../services/api";
+// ✅ ADDED: Import toast notification
+import { addToast, ToastContainer } from "../../components/ToastNotification";
 
 function formatMoney(value) {
   const num = Number(value || 0);
@@ -137,8 +139,16 @@ export default function AdminUserDetailsPage() {
         twofa_enabled: Number(nextUser?.twofa_enabled || 0),
         email_verified: Number(nextUser?.email_verified || 0),
       });
+      
+      // ✅ ADDED: Toast notification for refresh success (only on silent refresh)
+      if (silent) {
+        addToast("User data refreshed", "success");
+      }
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      const errorMsg = getApiErrorMessage(err);
+      setError(errorMsg);
+      // ✅ ADDED: Toast notification for error
+      addToast(errorMsg, "error");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -164,11 +174,17 @@ export default function AdminUserDetailsPage() {
         token
       );
 
-      setSuccess("Funds added successfully.");
+      const successMsg = "Funds added successfully.";
+      setSuccess(successMsg);
+      // ✅ ADDED: Toast notification for add funds success
+      addToast(successMsg, "success");
       setAmountForm((prev) => ({ ...prev, addAmount: "", addNote: "" }));
       await loadUser(true);
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      const errorMsg = getApiErrorMessage(err);
+      setError(errorMsg);
+      // ✅ ADDED: Toast notification for error
+      addToast(errorMsg, "error");
     } finally {
       setActionLoading(false);
     }
@@ -189,7 +205,10 @@ export default function AdminUserDetailsPage() {
         token
       );
 
-      setSuccess("Funds decreased successfully.");
+      const successMsg = "Funds decreased successfully.";
+      setSuccess(successMsg);
+      // ✅ ADDED: Toast notification for decrease funds success
+      addToast(successMsg, "success");
       setAmountForm((prev) => ({
         ...prev,
         decreaseAmount: "",
@@ -197,7 +216,10 @@ export default function AdminUserDetailsPage() {
       }));
       await loadUser(true);
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      const errorMsg = getApiErrorMessage(err);
+      setError(errorMsg);
+      // ✅ ADDED: Toast notification for error
+      addToast(errorMsg, "error");
     } finally {
       setActionLoading(false);
     }
@@ -220,10 +242,16 @@ export default function AdminUserDetailsPage() {
         token
       );
 
-      setSuccess("User security updated successfully.");
+      const successMsg = "User security updated successfully.";
+      setSuccess(successMsg);
+      // ✅ ADDED: Toast notification for save security success
+      addToast(successMsg, "success");
       await loadUser(true);
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      const errorMsg = getApiErrorMessage(err);
+      setError(errorMsg);
+      // ✅ ADDED: Toast notification for error
+      addToast(errorMsg, "error");
     } finally {
       setSecuritySaving(false);
     }
@@ -244,17 +272,23 @@ export default function AdminUserDetailsPage() {
       setSuccess("");
   
       if (!user?.id) {
-        setError("User id is missing.");
+        const errorMsg = "User id is missing.";
+        setError(errorMsg);
+        addToast(errorMsg, "error");
         return;
       }
   
       if (!String(notificationForm.title || "").trim()) {
-        setError("Notification title is required.");
+        const errorMsg = "Notification title is required.";
+        setError(errorMsg);
+        addToast(errorMsg, "error");
         return;
       }
   
       if (!String(notificationForm.message || "").trim()) {
-        setError("Notification message is required.");
+        const errorMsg = "Notification message is required.";
+        setError(errorMsg);
+        addToast(errorMsg, "error");
         return;
       }
   
@@ -270,18 +304,26 @@ export default function AdminUserDetailsPage() {
       );
   
       if (response?.data?.success) {
-        setSuccess("Notification sent successfully.");
+        const successMsg = "Notification sent successfully.";
+        setSuccess(successMsg);
+        // ✅ ADDED: Toast notification for send notification success
+        addToast(successMsg, "success");
         setNotificationForm({
           title: "",
           message: "",
           type: "general",
         });
       } else {
-        setError(response?.data?.message || "Failed to send notification");
+        const errorMsg = response?.data?.message || "Failed to send notification";
+        setError(errorMsg);
+        addToast(errorMsg, "error");
       }
     } catch (err) {
       console.error("Send notification error:", err);
-      setError(getApiErrorMessage(err));
+      const errorMsg = getApiErrorMessage(err);
+      setError(errorMsg);
+      // ✅ ADDED: Toast notification for error
+      addToast(errorMsg, "error");
     } finally {
       setSendingNotification(false);
     }
@@ -301,10 +343,15 @@ export default function AdminUserDetailsPage() {
 
       await adminApi.deleteUser(id, token);
 
+      const successMsg = "User deleted successfully.";
+      addToast(successMsg, "success");
       alert("User deleted successfully.");
       navigate("/admin/users");
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      const errorMsg = getApiErrorMessage(err);
+      setError(errorMsg);
+      // ✅ ADDED: Toast notification for error
+      addToast(errorMsg, "error");
     } finally {
       setDeletingUser(false);
     }
@@ -340,6 +387,9 @@ export default function AdminUserDetailsPage() {
 
   return (
     <div className="space-y-5">
+      {/* ✅ ADDED: Toast Container */}
+      <ToastContainer />
+
       <section className="rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(34,197,94,0.10),transparent_18%),linear-gradient(180deg,#111827_0%,#020617_100%)] p-5 shadow-xl">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
