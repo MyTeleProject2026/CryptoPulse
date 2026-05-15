@@ -908,7 +908,8 @@ async function settleExpiredTrades() {
           note: `${trade.pair} ${trade.direction} trade settled as win`,
         });
 
-         try {
+        // ✅ Update user's target profit
+        try {
           await connection.execute(
             `UPDATE user_targets 
              SET current_profit = current_profit + ?
@@ -919,7 +920,7 @@ async function settleExpiredTrades() {
         } catch (_targetError) {
           // Silent fail - target might not exist
         }
-      }
+
       } else {
         profit = Number((-amount).toFixed(2));
 
@@ -949,7 +950,7 @@ async function settleExpiredTrades() {
         );
       }
     }
-   
+
     await connection.commit();
   } catch (error) {
     await connection.rollback();
@@ -958,7 +959,6 @@ async function settleExpiredTrades() {
     connection.release();
   }
 }
-
 async function settleDailyFunds() {
   const connection = await pool.getConnection();
 
