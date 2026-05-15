@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { RefreshCw, Search } from "lucide-react";
 import { adminApi, getApiErrorMessage } from "../../services/api";
+// ✅ ADDED: Import toast notification
+import { addToast, ToastContainer } from "../../components/ToastNotification";
 
 function formatAmount(v) {
   const num = Number(v || 0);
@@ -95,8 +97,16 @@ export default function AdminWithdrawalsPage() {
       setError("");
       const res = await adminApi.getWithdrawals(token);
       setWithdrawals(Array.isArray(res.data?.data) ? res.data.data : []);
+      
+      // ✅ ADDED: Toast notification for silent refresh success
+      if (silentRefresh) {
+        addToast("Withdrawals refreshed", "success");
+      }
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      const errorMsg = getApiErrorMessage(err);
+      setError(errorMsg);
+      // ✅ ADDED: Toast notification for error
+      addToast(errorMsg, "error");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -113,10 +123,16 @@ export default function AdminWithdrawalsPage() {
       setSuccess("");
 
       await adminApi.approveWithdrawal(id, {}, token);
-      setSuccess(`Withdrawal #${id} approved successfully.`);
+      const successMsg = `Withdrawal #${id} approved successfully.`;
+      setSuccess(successMsg);
+      // ✅ ADDED: Toast notification for approve success
+      addToast(successMsg, "success");
       await fetchWithdrawals(false, false);
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      const errorMsg = getApiErrorMessage(err);
+      setError(errorMsg);
+      // ✅ ADDED: Toast notification for error
+      addToast(errorMsg, "error");
     } finally {
       setActionLoading("");
     }
@@ -134,10 +150,16 @@ export default function AdminWithdrawalsPage() {
       setSuccess("");
 
       await adminApi.rejectWithdrawal(id, {}, token);
-      setSuccess(`Withdrawal #${id} rejected and refunded successfully.`);
+      const successMsg = `Withdrawal #${id} rejected and refunded successfully.`;
+      setSuccess(successMsg);
+      // ✅ ADDED: Toast notification for reject success
+      addToast(successMsg, "success");
       await fetchWithdrawals(false, false);
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      const errorMsg = getApiErrorMessage(err);
+      setError(errorMsg);
+      // ✅ ADDED: Toast notification for error
+      addToast(errorMsg, "error");
     } finally {
       setActionLoading("");
     }
@@ -226,6 +248,9 @@ export default function AdminWithdrawalsPage() {
 
   return (
     <div className="space-y-5">
+      {/* ✅ ADDED: Toast Container */}
+      <ToastContainer />
+
       <section className="rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(124,58,237,0.10),transparent_18%),linear-gradient(180deg,#111827_0%,#020617_100%)] p-5 shadow-xl">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
