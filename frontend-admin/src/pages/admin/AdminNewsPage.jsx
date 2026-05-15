@@ -9,6 +9,8 @@ import {
   Image as ImageIcon,
 } from "lucide-react";
 import { adminApi, getApiErrorMessage } from "../../services/api";
+// ✅ ADDED: Import toast notification
+import { addToast, ToastContainer } from "../../components/ToastNotification";
 
 function resolveImage(url) {
   if (!url) return "";
@@ -68,8 +70,14 @@ export default function AdminNewsPage() {
 
       const res = await adminApi.getNews(token);
       setList(Array.isArray(res.data?.data) ? res.data.data : []);
+      
+      // ✅ ADDED: Toast notification for silent refresh
+      addToast("News list refreshed", "success");
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      const errorMsg = getApiErrorMessage(err);
+      setError(errorMsg);
+      // ✅ ADDED: Toast notification for error
+      addToast(errorMsg, "error");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -83,8 +91,11 @@ export default function AdminNewsPage() {
   async function createNews() {
     try {
       if (!form.title.trim()) {
-        setError("Title is required.");
+        const errorMsg = "Title is required.";
+        setError(errorMsg);
         setSuccess("");
+        // ✅ ADDED: Toast notification for validation error
+        addToast(errorMsg, "error");
         return;
       }
 
@@ -109,11 +120,17 @@ export default function AdminNewsPage() {
         is_active: true,
       });
 
-      setSuccess("News posted successfully.");
+      const successMsg = "News posted successfully.";
+      setSuccess(successMsg);
+      // ✅ ADDED: Toast notification for create success
+      addToast(successMsg, "success");
       await load();
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      const errorMsg = getApiErrorMessage(err);
+      setError(errorMsg);
       setSuccess("");
+      // ✅ ADDED: Toast notification for error
+      addToast(errorMsg, "error");
     } finally {
       setSubmitting(false);
     }
@@ -125,11 +142,17 @@ export default function AdminNewsPage() {
       setSuccess("");
 
       await adminApi.deleteNews(id, token);
-      setSuccess("News deleted successfully.");
+      const successMsg = "News deleted successfully.";
+      setSuccess(successMsg);
+      // ✅ ADDED: Toast notification for delete success
+      addToast(successMsg, "success");
       await load();
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      const errorMsg = getApiErrorMessage(err);
+      setError(errorMsg);
       setSuccess("");
+      // ✅ ADDED: Toast notification for error
+      addToast(errorMsg, "error");
     }
   }
 
@@ -150,15 +173,24 @@ export default function AdminNewsPage() {
           token
         );
 
-        setSuccess("News status updated.");
+        const successMsg = "News status updated.";
+        setSuccess(successMsg);
+        // ✅ ADDED: Toast notification for toggle success
+        addToast(successMsg, "success");
         await load();
         return;
       }
 
-      setError("updateNews API is not connected yet in services/api.js");
+      const errorMsg = "updateNews API is not connected yet in services/api.js";
+      setError(errorMsg);
+      // ✅ ADDED: Toast notification for API error
+      addToast(errorMsg, "error");
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      const errorMsg = getApiErrorMessage(err);
+      setError(errorMsg);
       setSuccess("");
+      // ✅ ADDED: Toast notification for error
+      addToast(errorMsg, "error");
     }
   }
 
@@ -174,6 +206,9 @@ export default function AdminNewsPage() {
 
   return (
     <div className="space-y-5 text-white">
+      {/* ✅ ADDED: Toast Container */}
+      <ToastContainer />
+
       <section className="rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(163,230,53,0.10),transparent_18%),linear-gradient(180deg,#0f172a_0%,#020617_100%)] p-5 shadow-xl">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
