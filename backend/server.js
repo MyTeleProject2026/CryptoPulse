@@ -1146,7 +1146,7 @@ async function settleDailyFunds() {
 ========================= */
 
 // Generate or get user's QR code (Base64 version - uses database storage)
-qr-code", authenticateUser, async (req, res, next) => {
+app.get("/api/user/qr-code", authenticateUser, async (req, res, next) => {
   try {
     const userId = req.user.id;
     
@@ -1231,7 +1231,7 @@ qr-code", authenticateUser, async (req, res, next) => {
 });
 
 // Get user by UID (for scanning)
-by-uid/:uid", authenticateUser, async (req, res, next) => {
+app.get("/api/user/by-uid/:uid", authenticateUser, async (req, res, next) => {
   try {
     const { uid } = req.params;
     
@@ -1397,7 +1397,7 @@ app.post("/api/user/transfer", authenticateUser, async (req, res, next) => {
 });
 
 // Get transfer history
-transfers", authenticateUser, async (req, res, next) => {
+app.get("/api/user/transfers", authenticateUser, async (req, res, next) => {
   try {
     const userId = req.user.id;
     
@@ -1764,7 +1764,7 @@ app.post("/api/auth/reset-password", async (req, res, next) => {
   }
 });
 
-profile", authenticateUser, async (req, res, next) => {
+app.get("/api/user/profile", authenticateUser, async (req, res, next) => {
   try {
     const [rows] = await pool.execute(
       `SELECT
