@@ -8206,7 +8206,7 @@ app.delete("/api/admin/fund-rules/:id", authenticateAdmin, async (req, res, next
 ========================= */
 
 // Get admin notifications (aggregated from various sources)
-app.get("/", authenticateAdmin, async (req, res, next) => {
+app.get("/api/admin/notifications-summary", authenticateAdmin, async (req, res, next) => {
   try {
     const notifications = [];
 
@@ -8298,7 +8298,7 @@ app.get("/", authenticateAdmin, async (req, res, next) => {
 });
 
 // Mark notification as read (store in memory or session)
-app.put("//:id/read", authenticateAdmin, async (req, res, next) => {
+app.put("/api/admin/notifications/:id/read", authenticateAdmin, async (req, res, next) => {
   try {
     // For now, just return success
     // In production, you would store read status in a database table
