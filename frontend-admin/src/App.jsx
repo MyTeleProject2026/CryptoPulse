@@ -1,4 +1,6 @@
 import { Routes, Route, Navigate } from "react-router-dom";
+// ✅ ADDED: Import ToastProvider and ToastContainer
+import { ToastProvider, ToastContainer } from "./components/ToastNotification";
 
 import AdminLoginPage from "./pages/admin/AdminLoginPage";
 import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
@@ -35,59 +37,62 @@ function PrivateRoute({ children }) {
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Navigate to="/admin/login" replace />} />
-      <Route path="/admin/login" element={<AdminLoginPage />} />
-
-      <Route
-        path="/admin"
-        element={
-          <PrivateRoute>
-            <AdminLayout />
-          </PrivateRoute>
-        }
-      >
-        <Route index element={<Navigate to="dashboard" replace />} />
-        <Route path="dashboard" element={<AdminDashboardPage />} />
-        <Route path="users" element={<AdminUsersPage />} />
-        <Route path="users/:id" element={<AdminUserDetailsPage />} />
-        <Route path="kyc" element={<AdminKycPage />} />
-        <Route path="deposits" element={<AdminDepositsPage />} />
-        <Route
-          path="deposit-networks"
-          element={<AdminDepositNetworksPage />}
-        />
-        <Route path="withdrawals" element={<AdminWithdrawalsPage />} />
-        <Route
-          path="withdrawal-fees"
-          element={<AdminWithdrawalFeesPage />}
-        />
-        <Route path="trades" element={<AdminTradesPage />} />
-        <Route path="trade-rules" element={<AdminTradeRulesPage />} />
-
-        <Route path="withdrawal-settings" element={<AdminWithdrawalSettingsPage />} />
-        <Route path="profit-withdrawal-requests" element={<AdminProfitWithdrawalRequestsPage />} />
+    <ToastProvider>
+      <Routes>
+        <Route path="/" element={<Navigate to="/admin/login" replace />} />
+        <Route path="/admin/login" element={<AdminLoginPage />} />
 
         <Route
-          path="trading-funds-control"
-          element={<AdminTradingFundsControlPage />}
-        />
-        <Route path="joint-account-requests" element={<AdminJointAccountRequests />} />
-        <Route path="joint-accounts" element={<AdminJointAccountsPage />} />
+          path="/admin"
+          element={
+            <PrivateRoute>
+              <AdminLayout />
+            </PrivateRoute>
+          }
+        >
+          <Route index element={<Navigate to="dashboard" replace />} />
+          <Route path="dashboard" element={<AdminDashboardPage />} />
+          <Route path="users" element={<AdminUsersPage />} />
+          <Route path="users/:id" element={<AdminUserDetailsPage />} />
+          <Route path="kyc" element={<AdminKycPage />} />
+          <Route path="deposits" element={<AdminDepositsPage />} />
+          <Route
+            path="deposit-networks"
+            element={<AdminDepositNetworksPage />}
+          />
+          <Route path="withdrawals" element={<AdminWithdrawalsPage />} />
+          <Route
+            path="withdrawal-fees"
+            element={<AdminWithdrawalFeesPage />}
+          />
+          <Route path="trades" element={<AdminTradesPage />} />
+          <Route path="trade-rules" element={<AdminTradeRulesPage />} />
 
-        <Route path="audit-logs" element={<AdminAuditLogsPage />} />
-        <Route path="support" element={<AdminSupportPage />} />
-        <Route
-          path="platform-settings"
-          element={<AdminPlatformSettingsPage />}
-        />
-        <Route path="loans" element={<AdminLoanPage />} />
-        <Route path="loan-settings" element={<AdminLoanSettingsPage />} />
-        <Route path="legal-docs" element={<AdminLegalDocumentsPage />} />
-        <Route path="news" element={<AdminNewsPage />} />
-      </Route>
+          <Route path="withdrawal-settings" element={<AdminWithdrawalSettingsPage />} />
+          <Route path="profit-withdrawal-requests" element={<AdminProfitWithdrawalRequestsPage />} />
 
-      <Route path="*" element={<Navigate to="/admin/login" replace />} />
-    </Routes>
+          <Route
+            path="trading-funds-control"
+            element={<AdminTradingFundsControlPage />}
+          />
+          <Route path="joint-account-requests" element={<AdminJointAccountRequests />} />
+          <Route path="joint-accounts" element={<AdminJointAccountsPage />} />
+
+          <Route path="audit-logs" element={<AdminAuditLogsPage />} />
+          <Route path="support" element={<AdminSupportPage />} />
+          <Route
+            path="platform-settings"
+            element={<AdminPlatformSettingsPage />}
+          />
+          <Route path="loans" element={<AdminLoanPage />} />
+          <Route path="loan-settings" element={<AdminLoanSettingsPage />} />
+          <Route path="legal-docs" element={<AdminLegalDocumentsPage />} />
+          <Route path="news" element={<AdminNewsPage />} />
+        </Route>
+
+        <Route path="*" element={<Navigate to="/admin/login" replace />} />
+      </Routes>
+      <ToastContainer />
+    </ToastProvider>
   );
 }
