@@ -13,10 +13,13 @@ import {
   Clock3,
   Eye,
   CandlestickChart,
+  MessageCircle,  // ✅ ADDED: Import chat icon
 } from "lucide-react";
 import { adminApi, getApiErrorMessage } from "../../services/api";
 // ✅ ADDED: Import toast notification
 import { addToast, ToastContainer } from "../../components/ToastNotification";
+// ✅ ADDED: Import Admin Chat Panel
+import AdminChatPanel from "../../components/AdminChatPanel";
 
 function formatMoney(value) {
   const num = Number(value || 0);
@@ -131,6 +134,10 @@ export default function AdminDashboardPage() {
     localStorage.getItem("admin_token") ||
     "";
 
+  // ✅ ADDED: Get admin info for chat
+  const adminId = localStorage.getItem("adminId") || "1";
+  const adminName = localStorage.getItem("adminName") || "Admin";
+
   const [stats, setStats] = useState({
     totalUsers: 0,
     activeUsers: 0,
@@ -152,6 +159,7 @@ export default function AdminDashboardPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showChatPanel, setShowChatPanel] = useState(false);  // ✅ ADDED
 
   useEffect(() => {
     loadDashboard();
@@ -173,14 +181,12 @@ export default function AdminDashboardPage() {
       const res = await adminApi.getDashboardStats(token);
       setStats(res.data?.data || {});
       
-      // ✅ ADDED: Toast notification for silent refresh
       if (silent) {
         addToast("Dashboard refreshed", "success");
       }
     } catch (err) {
       const errorMsg = getApiErrorMessage(err);
       setError(errorMsg);
-      // ✅ ADDED: Toast notification for error
       addToast(errorMsg, "error");
     } finally {
       setLoading(false);
@@ -201,7 +207,6 @@ export default function AdminDashboardPage() {
     try {
       await adminApi.markNotificationRead?.(id, token);
       await loadNotifications(true);
-      // ✅ ADDED: Toast notification for marking read
       addToast("Notification marked as read", "info");
     } catch (err) {
       console.error("Failed to mark notification as read:", err);
@@ -230,6 +235,17 @@ export default function AdminDashboardPage() {
       {/* ✅ ADDED: Toast Container */}
       <ToastContainer />
 
+      {/* ✅ ADDED: Chat Panel */}
+      <AdminChatPanel adminId={adminId} adminName={adminName} />
+
+      {/* ✅ ADDED: Chat Toggle Button (floating) */}
+      <button
+        onClick={() => setShowChatPanel(!showChatPanel)}
+        className="fixed bottom-20 right-4 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-lime-400 text-black shadow-lg transition hover:bg-lime-300 md:bottom-6"
+      >
+        <MessageCircle size={20} />
+      </button>
+
       <section className="rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(34,197,94,0.10),transparent_18%),linear-gradient(180deg,#111827_0%,#020617_100%)] p-5 shadow-xl">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -245,7 +261,6 @@ export default function AdminDashboardPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            {/* Pending Actions Badge */}
             {pendingCount > 0 && (
               <div className="inline-flex items-center gap-2 rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-300">
                 <Clock3 size={12} />
@@ -253,7 +268,6 @@ export default function AdminDashboardPage() {
               </div>
             )}
 
-            {/* Notifications Bell */}
             <button
               type="button"
               onClick={() => setShowNotifications(!showNotifications)}
