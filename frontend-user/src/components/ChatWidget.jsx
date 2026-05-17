@@ -63,6 +63,7 @@ export default function ChatWidget({ userId, userName }) {
       const totalUnread = (data.conversations || []).reduce((sum, conv) => sum + (conv.unread_user || 0), 0);
       setUnreadCount(totalUnread);
       
+      // ✅ FIXED: Load messages for first conversation
       if (!activeConversation && data.conversations?.length > 0) {
         const firstConv = data.conversations[0];
         setActiveConversation(firstConv);
@@ -72,6 +73,7 @@ export default function ChatWidget({ userId, userName }) {
     });
 
     chatApi.onMessagesLoaded((data) => {
+      console.log("Messages loaded:", data);
       setMessages(data.messages || []);
       scrollToBottom();
     });
@@ -86,9 +88,9 @@ export default function ChatWidget({ userId, userName }) {
   }, [userId, userName]);
 
   const handleSendMessage = () => {
-    if (!inputMessage.trim()) return;
+    if (!inputMessage.trim() || !activeConversation?.id) return;
     
-    chatApi.sendMessage(activeConversation?.id, inputMessage.trim());
+    chatApi.sendMessage(activeConversation.id, inputMessage.trim());
     setInputMessage("");
   };
 
@@ -109,9 +111,10 @@ export default function ChatWidget({ userId, userName }) {
     }
   };
 
+  // ✅ FIXED: Handle selecting a conversation
   const handleSelectConversation = (conversation) => {
     setActiveConversation(conversation);
-    setMessages([]);
+    setMessages([]); // Clear previous messages while loading
     chatApi.getMessages(conversation.id);
     chatApi.markRead(conversation.id);
     setUnreadCount(0);
