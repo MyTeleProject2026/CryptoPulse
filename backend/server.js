@@ -156,7 +156,6 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 // Create HTTP server for Socket.io
 const server = http.createServer(app);
 
-// Initialize Socket.io with CORS
 const io = socketIo(server, {
   cors: {
     origin: allowedOrigins,
@@ -165,29 +164,17 @@ const io = socketIo(server, {
   }
 });
 
-// Store connected users
 const connectedUsers = new Map();
 
-// Socket.io connection handling
 io.on('connection', (socket) => {
   console.log('New client connected:', socket.id);
 
   socket.on('authenticate', (data) => {
     const { userId, role, name } = data;
-    
     if (!userId) return;
-    
-    connectedUsers.set(userId, {
-      socketId: socket.id,
-      role: role || 'user',
-      name: name || 'User'
-    });
-    
+    connectedUsers.set(userId, { socketId: socket.id, role: role || 'user', name: name || 'User' });
     socket.userId = userId;
     socket.role = role || 'user';
-    
-    console.log(`Authenticated: ${role || 'user'} ${userId}`);
-    
     if (role === 'admin') {
       socket.join('admin_room');
       sendActiveConversationsToAdmin(socket);
@@ -199,14 +186,11 @@ io.on('connection', (socket) => {
       const { conversationId, message } = data;
       const senderId = socket.userId;
       const senderRole = socket.role;
-      
       if (!senderId || !message || !message.trim()) return;
       
       const connection = await pool.getConnection();
-      
       try {
         let convId = conversationId;
-        
         if (!convId) {
           const [result] = await connection.execute(
             `INSERT INTO chat_conversations (user_id, admin_id, status, last_message, last_message_time, created_at, updated_at)
@@ -216,9 +200,7 @@ io.on('connection', (socket) => {
           convId = result.insertId;
         } else {
           await connection.execute(
-            `UPDATE chat_conversations 
-             SET last_message = ?, last_message_time = NOW(), updated_at = NOW()
-             WHERE id = ?`,
+            `UPDATE chat_conversations SET last_message = ?, last_message_time = NOW(), updated_at = NOW() WHERE id = ?`,
             [message.trim(), convId]
           );
         }
@@ -230,11 +212,7 @@ io.on('connection', (socket) => {
         );
         
         if (senderRole === 'user') {
-          await connection.execute(
-            `UPDATE chat_conversations SET unread_admin = unread_admin + 1, updated_at = NOW() WHERE id = ?`,
-            [convId]
-          );
-          
+          await connection.execute(`UPDATE chat_conversations SET unread_admin = unread_admin + 1, updated_at = NOW() WHERE id = ?`, [convId]);
           io.to('admin_room').emit('new_message', {
             id: msgResult.insertId,
             conversationId: convId,
@@ -245,19 +223,10 @@ io.on('connection', (socket) => {
             userName: connectedUsers.get(senderId)?.name || 'User'
           });
         } else {
-          const [convRows] = await connection.execute(
-            `SELECT user_id FROM chat_conversations WHERE id = ?`,
-            [convId]
-          );
-          
+          const [convRows] = await connection.execute(`SELECT user_id FROM chat_conversations WHERE id = ?`, [convId]);
           if (convRows.length > 0) {
             const userId = convRows[0].user_id;
-            
-            await connection.execute(
-              `UPDATE chat_conversations SET unread_user = unread_user + 1, updated_at = NOW() WHERE id = ?`,
-              [convId]
-            );
-            
+            await connection.execute(`UPDATE chat_conversations SET unread_user = unread_user + 1, updated_at = NOW() WHERE id = ?`, [convId]);
             const userSocket = connectedUsers.get(userId);
             if (userSocket) {
               io.to(userSocket.socketId).emit('new_message', {
@@ -271,21 +240,9 @@ io.on('connection', (socket) => {
             }
           }
         }
-        
-        socket.emit('message_sent', {
-          id: msgResult.insertId,
-          conversationId: convId,
-          message: message.trim(),
-          createdAt: new Date().toISOString()
-        });
-        
-      } finally {
-        connection.release();
-      }
-    } catch (error) {
-      console.error('Send message error:', error);
-      socket.emit('message_error', { error: error.message });
-    }
+        socket.emit('message_sent', { id: msgResult.insertId, conversationId: convId, message: message.trim(), createdAt: new Date().toISOString() });
+      } finally { connection.release(); }
+    } catch (error) { console.error('Send message error:', error); socket.emit('message_error', { error: error.message }); }
   });
 
   socket.on('mark_read', async (data) => {
@@ -293,93 +250,56 @@ io.on('connection', (socket) => {
       const { conversationId } = data;
       const userId = socket.userId;
       const role = socket.role;
-      
       if (!conversationId || !userId) return;
-      
       const connection = await pool.getConnection();
-      
       try {
         if (role === 'admin') {
           await connection.execute(`UPDATE chat_conversations SET unread_admin = 0 WHERE id = ?`, [conversationId]);
         } else {
           await connection.execute(`UPDATE chat_conversations SET unread_user = 0 WHERE id = ?`, [conversationId]);
-          await connection.execute(
-            `UPDATE chat_messages SET is_read = 1 
-             WHERE conversation_id = ? AND sender_type = 'admin' AND is_read = 0`,
-            [conversationId]
-          );
+          await connection.execute(`UPDATE chat_messages SET is_read = 1 WHERE conversation_id = ? AND sender_type = 'admin' AND is_read = 0`, [conversationId]);
         }
         socket.emit('read_confirmed', { conversationId });
-      } finally {
-        connection.release();
-      }
-    } catch (error) {
-      console.error('Mark read error:', error);
-    }
+      } finally { connection.release(); }
+    } catch (error) { console.error('Mark read error:', error); }
   });
 
-    socket.on('get_conversations', async () => {
+  socket.on('get_conversations', async () => {
     const userId = socket.userId;
     if (!userId) return;
-    
     const connection = await pool.getConnection();
     try {
       const [conversations] = await connection.execute(
         `SELECT id, user_id, status, unread_user, last_message, last_message_time, created_at, updated_at
-         FROM chat_conversations
-         WHERE user_id = ? AND status = 'active'
-         ORDER BY updated_at DESC
-         LIMIT 10`,
+         FROM chat_conversations WHERE user_id = ? AND status = 'active' ORDER BY updated_at DESC LIMIT 10`,
         [userId]
       );
       socket.emit('user_conversations', { conversations });
-    } finally {
-      connection.release();
-    }
+    } finally { connection.release(); }
   });
 
-  // ✅ ADD THIS RIGHT HERE
+  // ✅ CRITICAL ADDITION - Get messages for a conversation
   socket.on('get_messages', async (data) => {
     const { conversationId } = data;
     const userId = socket.userId;
     const role = socket.role;
-    
     if (!conversationId || !userId) return;
-    
     const connection = await pool.getConnection();
     try {
       let hasAccess = false;
-      
       if (role === 'admin') {
-        const [rows] = await connection.execute(
-          `SELECT id FROM chat_conversations WHERE id = ?`,
-          [conversationId]
-        );
+        const [rows] = await connection.execute(`SELECT id FROM chat_conversations WHERE id = ?`, [conversationId]);
         hasAccess = rows.length > 0;
       } else {
-        const [rows] = await connection.execute(
-          `SELECT id FROM chat_conversations WHERE id = ? AND user_id = ?`,
-          [conversationId, userId]
-        );
+        const [rows] = await connection.execute(`SELECT id FROM chat_conversations WHERE id = ? AND user_id = ?`, [conversationId, userId]);
         hasAccess = rows.length > 0;
       }
-      
-      if (!hasAccess) {
-        socket.emit('error', { message: 'Access denied' });
-        return;
-      }
-      
+      if (!hasAccess) { socket.emit('error', { message: 'Access denied' }); return; }
       const [messages] = await connection.execute(
         `SELECT id, conversation_id, sender_id, sender_type, message, is_read, created_at
-         FROM chat_messages
-         WHERE conversation_id = ?
-         ORDER BY created_at ASC
-         LIMIT 200`,
+         FROM chat_messages WHERE conversation_id = ? ORDER BY created_at ASC LIMIT 200`,
         [conversationId]
       );
-      
-      console.log(`Sending ${messages.length} messages for conversation ${conversationId}`);
-      
       socket.emit('messages_loaded', {
         conversationId,
         messages: messages.map(msg => ({
@@ -391,19 +311,12 @@ io.on('connection', (socket) => {
           createdAt: msg.created_at
         }))
       });
-    } catch (error) {
-      console.error('Get messages error:', error);
-      socket.emit('error', { message: error.message });
-    } finally {
-      connection.release();
-    }
+    } catch (error) { console.error('Get messages error:', error); socket.emit('error', { message: error.message }); }
+    finally { connection.release(); }
   });
 
   socket.on('disconnect', () => {
-    if (socket.userId) {
-      connectedUsers.delete(socket.userId);
-      console.log(`User ${socket.userId} disconnected`);
-    }
+    if (socket.userId) { connectedUsers.delete(socket.userId); console.log(`User ${socket.userId} disconnected`); }
   });
 });
 
@@ -413,46 +326,14 @@ async function sendActiveConversationsToAdmin(socket) {
     const [conversations] = await connection.execute(
       `SELECT c.id, c.user_id, c.status, c.unread_admin, c.unread_user, c.last_message, c.last_message_time, c.created_at, c.updated_at,
               u.name as user_name, u.email as user_email, u.uid as user_uid
-       FROM chat_conversations c
-       LEFT JOIN users u ON u.id = c.user_id
-       WHERE c.status = 'active'
-       ORDER BY c.updated_at DESC
-       LIMIT 50`
+       FROM chat_conversations c LEFT JOIN users u ON u.id = c.user_id
+       WHERE c.status = 'active' ORDER BY c.updated_at DESC LIMIT 50`
     );
     socket.emit('admin_conversations', { conversations });
-  } finally {
-    connection.release();
-  }
+  } finally { connection.release(); }
 }
 
-// Add this function at the bottom of your file, before server.listen
-async function sendMessagesToAdmin(socket, conversationId) {
-  const connection = await pool.getConnection();
-  try {
-    const [messages] = await connection.execute(
-      `SELECT id, conversation_id, sender_id, sender_type, message, is_read, created_at
-       FROM chat_messages
-       WHERE conversation_id = ?
-       ORDER BY created_at ASC
-       LIMIT 200`,
-      [conversationId]
-    );
-    
-    socket.emit('messages_loaded', {
-      conversationId,
-      messages: messages.map(msg => ({
-        id: msg.id,
-        conversationId: msg.conversation_id,
-        message: msg.message,
-        senderType: msg.sender_type,
-        isRead: msg.is_read === 1,
-        createdAt: msg.created_at
-      }))
-    });
-  } finally {
-    connection.release();
-  }
-}
+
 
 
 const PORT = process.env.PORT || 5000;
@@ -9237,6 +9118,36 @@ app.use((error, _req, res, _next) => {
   });
 });
 
+
+// Add this function at the bottom of your file, before server.listen
+async function sendMessagesToAdmin(socket, conversationId) {
+  const connection = await pool.getConnection();
+  try {
+    const [messages] = await connection.execute(
+      `SELECT id, conversation_id, sender_id, sender_type, message, is_read, created_at
+       FROM chat_messages
+       WHERE conversation_id = ?
+       ORDER BY created_at ASC
+       LIMIT 200`,
+      [conversationId]
+    );
+    
+    socket.emit('messages_loaded', {
+      conversationId,
+      messages: messages.map(msg => ({
+        id: msg.id,
+        conversationId: msg.conversation_id,
+        message: msg.message,
+        senderType: msg.sender_type,
+        isRead: msg.is_read === 1,
+        createdAt: msg.created_at
+      }))
+    });
+  } finally {
+    connection.release();
+  }
+}
+       
 /* =========================
    SERVER START
 ========================= */
@@ -9260,9 +9171,8 @@ server.listen(PORT, async () => {
     } else {
       console.log(`⚠️ Mail service not configured. Email features will not work.`);
     }
-  } catch (error) {
-    console.error("❌ MySQL connection failed:", error.message);
-  }
+  } catch (error) { console.error("❌ MySQL connection failed:", error.message);
+}
 });
 
 setInterval(() => {
