@@ -24,6 +24,7 @@ import {
   Wallet,
   BellRing,
   FileText,
+  DollarSign,  // ✅ ADDED: DollarSign icon for Profit Withdrawal Requests menu item
 } from "lucide-react";
 
 const navItems = [
