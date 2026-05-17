@@ -21,7 +21,7 @@ import {
   getApiErrorMessage,
 } from "../services/api";
 import { useNotification } from "../hooks/useNotification";
-// ✅ ADDED: Import Target Modal
+// ✅ ADDED FROM VexaTrade: Import Target Modal
 import TargetModal from "../components/TargetModal";
 
 const DEFAULT_PAIRS = [
@@ -292,7 +292,7 @@ export default function TradePage() {
     typeof window !== "undefined" ? window.innerWidth : 1440
   );
 
-  // ✅ ADDED: Target system states
+  // ✅ ADDED FROM VexaTrade: Target system states
   const [hasTarget, setHasTarget] = useState(false);
   const [showTargetModal, setShowTargetModal] = useState(false);
   const [targetChecking, setTargetChecking] = useState(true);
@@ -302,7 +302,7 @@ export default function TradePage() {
   const lastPlacedTradeIdRef = useRef(null);
   const shownSettledTradeIdRef = useRef(null);
 
-  // ✅ ADDED: Check if user has set a target
+  // ✅ ADDED FROM VexaTrade: Check if user has set a target
   async function checkUserTarget() {
     try {
       setTargetChecking(true);
@@ -327,7 +327,7 @@ export default function TradePage() {
     }
   }
 
-  // ✅ ADDED: Refresh target progress after trades
+  // ✅ ADDED FROM VexaTrade: Refresh target progress after trades
   async function refreshTargetProgress() {
     try {
       const res = await userApi.getUserTarget(token);
@@ -341,6 +341,16 @@ export default function TradePage() {
     } catch (err) {
       console.error("Failed to refresh target:", err);
     }
+  }
+
+  // ✅ ADDED FROM VexaTrade: Handle target set success
+  function handleTargetSet(targetAmount) {
+    setHasTarget(true);
+    setTargetProgress({
+      currentProfit: 0,
+      targetAmount: Number(targetAmount),
+    });
+    showSuccess(`Target set to ${targetAmount} USDT! You can now start trading.`);
   }
 
   const marketMap = useMemo(() => {
@@ -396,6 +406,7 @@ export default function TradePage() {
     return 420;
   }, [screenWidth]);
 
+  // ✅ ADDED FROM VexaTrade: Target progress percentage
   const targetProgressPercent = useMemo(() => {
     if (targetProgress.targetAmount <= 0) return 0;
     return (targetProgress.currentProfit / targetProgress.targetAmount) * 100;
@@ -403,7 +414,7 @@ export default function TradePage() {
 
   useEffect(() => {
     loadTradePage();
-    // ✅ ADDED: Check target on page load
+    // ✅ ADDED FROM VexaTrade: Check target on page load
     checkUserTarget();
   }, []);
 
@@ -456,7 +467,7 @@ export default function TradePage() {
 
     setShowRunningTradeModal(false);
     syncTradeState();
-    // ✅ ADDED: Refresh target progress after trade settles
+    // ✅ ADDED FROM VexaTrade: Refresh target progress after trade settles
     refreshTargetProgress();
   }, [remainingSeconds, showRunningTradeModal]);
 
@@ -591,7 +602,7 @@ export default function TradePage() {
         if (settledTrade && shownSettledTradeIdRef.current !== settledTrade.id) {
           shownSettledTradeIdRef.current = settledTrade.id;
           setResultModal(settledTrade);
-          // ✅ ADDED: Refresh target progress when trade settles
+          // ✅ ADDED FROM VexaTrade: Refresh target progress when trade settles
           refreshTargetProgress();
         }
       }
@@ -612,7 +623,7 @@ export default function TradePage() {
     }
   }
 
-  // ✅ ADDED: Modified handlePlaceTrade with target check
+  // ✅ ADDED FROM VexaTrade: Modified handlePlaceTrade with target check
   async function handlePlaceTrade(e) {
     e.preventDefault();
     setError("");
@@ -717,16 +728,6 @@ export default function TradePage() {
     }
   }
 
-  // ✅ ADDED: Handle target set success
-  function handleTargetSet(targetAmount) {
-    setHasTarget(true);
-    setTargetProgress({
-      currentProfit: 0,
-      targetAmount: Number(targetAmount),
-    });
-    showSuccess(`Target set to ${targetAmount} USDT! You can now start trading.`);
-  }
-
   if (loading) {
     return (
       <div className="p-4 sm:p-6">
@@ -750,7 +751,7 @@ export default function TradePage() {
 
   return (
     <div className="space-y-4 bg-black p-3 pb-24 sm:space-y-5 sm:p-6 xl:pb-6">
-      {/* ✅ ADDED: Target Progress Banner */}
+      {/* ✅ ADDED FROM VexaTrade: Target Progress Banner */}
       {hasTarget && targetProgress.targetAmount > 0 && (
         <div className="rounded-2xl border border-lime-500/20 bg-lime-500/10 p-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
@@ -1288,11 +1289,11 @@ export default function TradePage() {
         </div>
       ) : null}
 
-      {/* ✅ ADDED: Target Modal */}
+      {/* ✅ ADDED FROM VexaTrade: Target Modal */}
       <TargetModal
         isOpen={showTargetModal}
         onClose={() => setShowTargetModal(false)}
-        onTargetSet={handleTargetSet}
+        onSetTarget={handleTargetSet}
         requiredFor="trade"
       />
     </div>
