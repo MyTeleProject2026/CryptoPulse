@@ -22,7 +22,6 @@ export default function ChatWidget({ userId, userName }) {
   const messagesEndRef = useRef(null);
   const socketRef = useRef(null);
 
-  // Scroll to bottom of messages
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
@@ -31,7 +30,6 @@ export default function ChatWidget({ userId, userName }) {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  // Connect to socket when component mounts
   useEffect(() => {
     if (!userId) return;
 
@@ -41,9 +39,8 @@ export default function ChatWidget({ userId, userName }) {
     socketRef.current = socket;
     setIsConnected(true);
 
-    // Listen for new messages
     chatApi.onNewMessage((data) => {
-      if (data.conversationId === activeConversation?.id) {
+      if (activeConversation?.id === data.conversationId) {
         setMessages((prev) => [...prev, {
           id: data.id,
           message: data.message,
@@ -53,38 +50,32 @@ export default function ChatWidget({ userId, userName }) {
         scrollToBottom();
       }
       
-      // Update unread count
       if (data.senderType === "admin") {
         setUnreadCount((prev) => prev + 1);
       }
       
-      // Refresh conversations
       chatApi.getConversations();
     });
 
-    // Load conversations
     chatApi.onUserConversations((data) => {
       setConversations(data.conversations || []);
       
-      // Calculate total unread
       const totalUnread = (data.conversations || []).reduce((sum, conv) => sum + (conv.unread_user || 0), 0);
       setUnreadCount(totalUnread);
       
-      // If no active conversation and has conversations, load first one
       if (!activeConversation && data.conversations?.length > 0) {
-        setActiveConversation(data.conversations[0]);
-        chatApi.getMessages(data.conversations[0].id);
-        chatApi.markRead(data.conversations[0].id);
+        const firstConv = data.conversations[0];
+        setActiveConversation(firstConv);
+        chatApi.getMessages(firstConv.id);
+        chatApi.markRead(firstConv.id);
       }
     });
 
-    // Load messages
     chatApi.onMessagesLoaded((data) => {
       setMessages(data.messages || []);
       scrollToBottom();
     });
 
-    // Get initial conversations
     chatApi.getConversations();
 
     return () => {
@@ -112,7 +103,6 @@ export default function ChatWidget({ userId, userName }) {
     setIsOpen(true);
     setIsMinimized(false);
     
-    // Mark messages as read when opening
     if (activeConversation?.id) {
       chatApi.markRead(activeConversation.id);
       setUnreadCount(0);
@@ -121,6 +111,7 @@ export default function ChatWidget({ userId, userName }) {
 
   const handleSelectConversation = (conversation) => {
     setActiveConversation(conversation);
+    setMessages([]);
     chatApi.getMessages(conversation.id);
     chatApi.markRead(conversation.id);
     setUnreadCount(0);
@@ -144,7 +135,6 @@ export default function ChatWidget({ userId, userName }) {
 
   return (
     <div className="fixed bottom-0 right-0 z-50 flex flex-col w-full max-w-md bg-[#0a0e1a] border border-white/10 rounded-t-2xl shadow-2xl md:bottom-4 md:right-4 md:rounded-2xl overflow-hidden">
-      {/* Header */}
       <div className="flex items-center justify-between border-b border-white/10 bg-[#111111] px-4 py-3">
         <div className="flex items-center gap-2">
           <MessageCircle size={18} className="text-lime-400" />
@@ -171,7 +161,6 @@ export default function ChatWidget({ userId, userName }) {
 
       {!isMinimized && (
         <>
-          {/* Conversations List */}
           {conversations.length > 0 && (
             <div className="border-b border-white/10 bg-[#0f0f0f] px-2 py-2 overflow-x-auto">
               <div className="flex gap-2">
@@ -197,7 +186,6 @@ export default function ChatWidget({ userId, userName }) {
             </div>
           )}
 
-          {/* Messages Area */}
           <div className="h-96 overflow-y-auto p-4 space-y-3">
             {messages.length === 0 ? (
               <div className="flex h-full items-center justify-center text-center text-sm text-slate-400">
@@ -230,7 +218,6 @@ export default function ChatWidget({ userId, userName }) {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input Area */}
           <div className="border-t border-white/10 bg-[#111111] p-3">
             <div className="flex gap-2">
               <textarea
