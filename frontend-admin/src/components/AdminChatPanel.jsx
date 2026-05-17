@@ -41,7 +41,9 @@ export default function AdminChatPanel({ adminId, adminName }) {
     const socket = adminChatApi.connect(adminId, adminName, token);
     setIsConnected(true);
 
+    // Listen for new messages
     adminChatApi.onNewMessage((data) => {
+      // Update conversations list
       setConversations(prev => {
         const updated = prev.map(conv => 
           conv.id === data.conversationId 
@@ -56,6 +58,7 @@ export default function AdminChatPanel({ adminId, adminName }) {
         return updated;
       });
 
+      // If this is the selected conversation, add message to current view
       if (selectedConversation?.id === data.conversationId) {
         setMessages(prev => [...prev, {
           id: data.id,
@@ -69,15 +72,23 @@ export default function AdminChatPanel({ adminId, adminName }) {
         setConversations(prev => prev.map(conv =>
           conv.id === data.conversationId ? { ...conv, unread_admin: 0 } : conv
         ));
+      } else {
+        // Update unread count for non-selected conversation
+        setConversations(prev => prev.map(conv =>
+          conv.id === data.conversationId ? { ...conv, unread_admin: (conv.unread_admin || 0) + 1 } : conv
+        ));
       }
     });
 
+    // Load conversations list
     adminChatApi.onAdminConversations((data) => {
       setConversations(data.conversations || []);
       setIsLoading(false);
     });
 
+    // Load messages for selected conversation
     adminChatApi.onMessagesLoaded((data) => {
+      console.log("Messages loaded:", data);
       setMessages(data.messages || []);
       scrollToBottom();
     });
@@ -87,13 +98,27 @@ export default function AdminChatPanel({ adminId, adminName }) {
       adminChatApi.off("admin_conversations");
       adminChatApi.off("messages_loaded");
     };
-  }, [adminId, adminName, selectedConversation]);
+  }, [adminId, adminName]);
 
+  // ✅ FIXED: Handle selecting a conversation - THIS IS WHERE MESSAGES SHOULD LOAD
   const handleSelectConversation = (conversation) => {
     setSelectedConversation(conversation);
-    adminChatApi.getMessages(conversation.id);
-    adminChatApi.markRead(conversation.id);
+    setMessages([]); // Clear previous messages while loading
     
+    // ✅ IMPORTANT: Request messages for this conversation
+    const socket = adminChatApi.getSocket();
+    if (socket && adminChatApi.isConnected()) {
+      console.log("Requesting messages for conversation:", conversation.id);
+      socket.emit("get_messages", { conversationId: conversation.id });
+    }
+    
+    // Mark as read
+    const socket2 = adminChatApi.getSocket();
+    if (socket2 && adminChatApi.isConnected()) {
+      socket2.emit("mark_read", { conversationId: conversation.id });
+    }
+    
+    // Update local unread count
     setConversations(prev => prev.map(conv =>
       conv.id === conversation.id ? { ...conv, unread_admin: 0 } : conv
     ));
@@ -102,8 +127,25 @@ export default function AdminChatPanel({ adminId, adminName }) {
   const handleSendMessage = () => {
     if (!inputMessage.trim() || !selectedConversation) return;
     
-    adminChatApi.sendMessage(selectedConversation.id, inputMessage.trim());
-    setInputMessage("");
+    const socket = adminChatApi.getSocket();
+    if (socket && adminChatApi.isConnected()) {
+      socket.emit("send_message", { 
+        conversationId: selectedConversation.id, 
+        message: inputMessage.trim() 
+      });
+      
+      // Optimistically add message to UI
+      setMessages(prev => [...prev, {
+        id: Date.now(),
+        message: inputMessage.trim(),
+        senderType: "admin",
+        createdAt: new Date().toISOString(),
+        userName: adminName
+      }]);
+      
+      setInputMessage("");
+      scrollToBottom();
+    }
   };
 
   const handleKeyPress = (e) => {
@@ -133,6 +175,7 @@ export default function AdminChatPanel({ adminId, adminName }) {
       </div>
 
       <div className="flex flex-1 overflow-hidden">
+        {/* Conversations List */}
         <div className="w-80 border-r border-white/10 flex flex-col">
           <div className="p-3 border-b border-white/10">
             <h3 className="text-sm font-semibold text-white">Active Conversations</h3>
@@ -188,6 +231,7 @@ export default function AdminChatPanel({ adminId, adminName }) {
           </div>
         </div>
 
+        {/* Messages Area */}
         <div className="flex-1 flex flex-col">
           {selectedConversation ? (
             <>
