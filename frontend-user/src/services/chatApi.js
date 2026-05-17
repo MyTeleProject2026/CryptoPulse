@@ -60,6 +60,14 @@ export const chatApi = {
     }
   },
 
+  // ✅ ADD THIS FUNCTION - Get messages for a conversation
+  getMessages: (conversationId) => {
+    if (socket && isConnected) {
+      console.log("Requesting messages for conversation:", conversationId);
+      socket.emit("get_messages", { conversationId });
+    }
+  },
+
   // Mark messages as read
   markRead: (conversationId) => {
     if (socket && isConnected) {
@@ -71,13 +79,6 @@ export const chatApi = {
   getConversations: () => {
     if (socket && isConnected) {
       socket.emit("get_conversations");
-    }
-  },
-
-  // Get messages for a conversation
-  getMessages: (conversationId) => {
-    if (socket && isConnected) {
-      socket.emit("get_messages", { conversationId });
     }
   },
 
