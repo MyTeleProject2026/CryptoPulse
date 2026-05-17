@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, DollarSign, AlertCircle } from "lucide-react";
+import { RefreshCw, Wallet, Percent, LifeBuoy, BadgeDollarSign, DollarSign } from "lucide-react";
 
 export default function ProfitWithdrawalModal({ 
   isOpen, 
