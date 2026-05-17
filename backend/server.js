@@ -318,7 +318,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('get_conversations', async () => {
+    socket.on('get_conversations', async () => {
     const userId = socket.userId;
     if (!userId) return;
     
@@ -333,6 +333,67 @@ io.on('connection', (socket) => {
         [userId]
       );
       socket.emit('user_conversations', { conversations });
+    } finally {
+      connection.release();
+    }
+  });
+
+  // ✅ ADD THIS RIGHT HERE
+  socket.on('get_messages', async (data) => {
+    const { conversationId } = data;
+    const userId = socket.userId;
+    const role = socket.role;
+    
+    if (!conversationId || !userId) return;
+    
+    const connection = await pool.getConnection();
+    try {
+      let hasAccess = false;
+      
+      if (role === 'admin') {
+        const [rows] = await connection.execute(
+          `SELECT id FROM chat_conversations WHERE id = ?`,
+          [conversationId]
+        );
+        hasAccess = rows.length > 0;
+      } else {
+        const [rows] = await connection.execute(
+          `SELECT id FROM chat_conversations WHERE id = ? AND user_id = ?`,
+          [conversationId, userId]
+        );
+        hasAccess = rows.length > 0;
+      }
+      
+      if (!hasAccess) {
+        socket.emit('error', { message: 'Access denied' });
+        return;
+      }
+      
+      const [messages] = await connection.execute(
+        `SELECT id, conversation_id, sender_id, sender_type, message, is_read, created_at
+         FROM chat_messages
+         WHERE conversation_id = ?
+         ORDER BY created_at ASC
+         LIMIT 200`,
+        [conversationId]
+      );
+      
+      console.log(`Sending ${messages.length} messages for conversation ${conversationId}`);
+      
+      socket.emit('messages_loaded', {
+        conversationId,
+        messages: messages.map(msg => ({
+          id: msg.id,
+          conversationId: msg.conversation_id,
+          message: msg.message,
+          senderType: msg.sender_type,
+          isRead: msg.is_read === 1,
+          createdAt: msg.created_at
+        }))
+      });
+    } catch (error) {
+      console.error('Get messages error:', error);
+      socket.emit('error', { message: error.message });
     } finally {
       connection.release();
     }
@@ -359,6 +420,35 @@ async function sendActiveConversationsToAdmin(socket) {
        LIMIT 50`
     );
     socket.emit('admin_conversations', { conversations });
+  } finally {
+    connection.release();
+  }
+}
+
+// Add this function at the bottom of your file, before server.listen
+async function sendMessagesToAdmin(socket, conversationId) {
+  const connection = await pool.getConnection();
+  try {
+    const [messages] = await connection.execute(
+      `SELECT id, conversation_id, sender_id, sender_type, message, is_read, created_at
+       FROM chat_messages
+       WHERE conversation_id = ?
+       ORDER BY created_at ASC
+       LIMIT 200`,
+      [conversationId]
+    );
+    
+    socket.emit('messages_loaded', {
+      conversationId,
+      messages: messages.map(msg => ({
+        id: msg.id,
+        conversationId: msg.conversation_id,
+        message: msg.message,
+        senderType: msg.sender_type,
+        isRead: msg.is_read === 1,
+        createdAt: msg.created_at
+      }))
+    });
   } finally {
     connection.release();
   }
