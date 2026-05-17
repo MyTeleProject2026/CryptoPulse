@@ -336,7 +336,7 @@ export default function WithdrawPage() {
 
   // ✅ ADDED FROM VexaTrade: Handle profit withdrawal success
   function handleProfitWithdrawalSuccess() {
-    showSuccess("Profit withdrawal request submitted. Admin will review and approve.");
+    showSuccess("Profit withdrawal request submitted. Blockchain-based ecosystem will review and approve.");
     refreshTargetProgress();
     loadHistory(true);
   }
