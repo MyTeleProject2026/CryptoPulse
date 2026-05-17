@@ -3,6 +3,8 @@ import { Outlet, useLocation } from "react-router-dom";
 import AdminSidebar from "../components/AdminSidebar";
 import AppTopbar from "../components/AppTopbar";
 import AdminMobileBottomNav from "../components/AdminMobileBottomNav";
+// ✅ ADDED: Import DollarSign icon (needed by AdminSidebar component)
+import { DollarSign } from "lucide-react";
 
 const PAGE_META = {
   "/admin/dashboard": {
