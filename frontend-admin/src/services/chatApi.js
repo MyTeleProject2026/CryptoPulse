@@ -52,6 +52,13 @@ export const adminChatApi = {
 
   // Check if connected
   isConnected: () => isConnected,
+ 
+  // Add this function to adminChatApi object
+  getMessages: (conversationId) => {
+    if (socket && isConnected) {
+      socket.emit("get_messages", { conversationId });
+    }
+  },
 
   // Send message
   sendMessage: (conversationId, message) => {
