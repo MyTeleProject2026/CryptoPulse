@@ -18,6 +18,7 @@ export default function ChatWidget({ userId, userName }) {
   const [inputMessage, setInputMessage] = useState("");
   const [unreadCount, setUnreadCount] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
 
   const messagesEndRef = useRef(null);
   const socketRef = useRef(null);
@@ -39,7 +40,10 @@ export default function ChatWidget({ userId, userName }) {
     socketRef.current = socket;
     setIsConnected(true);
 
+    // Listen for new messages
     chatApi.onNewMessage((data) => {
+      console.log("New message received:", data);
+      
       if (activeConversation?.id === data.conversationId) {
         setMessages((prev) => [...prev, {
           id: data.id,
@@ -57,27 +61,34 @@ export default function ChatWidget({ userId, userName }) {
       chatApi.getConversations();
     });
 
+    // Load conversations
     chatApi.onUserConversations((data) => {
+      console.log("Conversations loaded:", data);
       setConversations(data.conversations || []);
       
       const totalUnread = (data.conversations || []).reduce((sum, conv) => sum + (conv.unread_user || 0), 0);
       setUnreadCount(totalUnread);
       
-      // ✅ FIXED: Load messages for first conversation
+      // ✅ FIXED: Set active conversation if not set and conversations exist
       if (!activeConversation && data.conversations?.length > 0) {
         const firstConv = data.conversations[0];
+        console.log("Setting active conversation to:", firstConv);
         setActiveConversation(firstConv);
+        setIsLoadingMessages(true);
         chatApi.getMessages(firstConv.id);
         chatApi.markRead(firstConv.id);
       }
     });
 
+    // Load messages
     chatApi.onMessagesLoaded((data) => {
       console.log("Messages loaded:", data);
       setMessages(data.messages || []);
+      setIsLoadingMessages(false);
       scrollToBottom();
     });
 
+    // Get initial conversations
     chatApi.getConversations();
 
     return () => {
@@ -88,9 +99,16 @@ export default function ChatWidget({ userId, userName }) {
   }, [userId, userName]);
 
   const handleSendMessage = () => {
-    if (!inputMessage.trim() || !activeConversation?.id) return;
+    if (!inputMessage.trim()) return;
     
-    chatApi.sendMessage(activeConversation.id, inputMessage.trim());
+    if (!activeConversation?.id) {
+      // If no active conversation, send without conversationId - backend will create one
+      console.log("No active conversation, sending new message");
+      chatApi.sendMessage(null, inputMessage.trim());
+    } else {
+      chatApi.sendMessage(activeConversation.id, inputMessage.trim());
+    }
+    
     setInputMessage("");
   };
 
@@ -111,14 +129,18 @@ export default function ChatWidget({ userId, userName }) {
     }
   };
 
-  // ✅ FIXED: Handle selecting a conversation
   const handleSelectConversation = (conversation) => {
+    console.log("Selecting conversation:", conversation);
     setActiveConversation(conversation);
-    setMessages([]); // Clear previous messages while loading
+    setMessages([]);
+    setIsLoadingMessages(true);
     chatApi.getMessages(conversation.id);
     chatApi.markRead(conversation.id);
     setUnreadCount(0);
   };
+
+  // Check if send button should be disabled
+  const isSendDisabled = !inputMessage.trim();
 
   if (!isOpen) {
     return (
@@ -138,6 +160,7 @@ export default function ChatWidget({ userId, userName }) {
 
   return (
     <div className="fixed bottom-0 right-0 z-50 flex flex-col w-full max-w-md bg-[#0a0e1a] border border-white/10 rounded-t-2xl shadow-2xl md:bottom-4 md:right-4 md:rounded-2xl overflow-hidden">
+      {/* Header */}
       <div className="flex items-center justify-between border-b border-white/10 bg-[#111111] px-4 py-3">
         <div className="flex items-center gap-2">
           <MessageCircle size={18} className="text-lime-400" />
@@ -164,6 +187,7 @@ export default function ChatWidget({ userId, userName }) {
 
       {!isMinimized && (
         <>
+          {/* Conversations List */}
           {conversations.length > 0 && (
             <div className="border-b border-white/10 bg-[#0f0f0f] px-2 py-2 overflow-x-auto">
               <div className="flex gap-2">
@@ -189,8 +213,15 @@ export default function ChatWidget({ userId, userName }) {
             </div>
           )}
 
+          {/* Messages Area */}
           <div className="h-96 overflow-y-auto p-4 space-y-3">
-            {messages.length === 0 ? (
+            {isLoadingMessages ? (
+              <div className="flex h-full items-center justify-center text-center text-sm text-slate-400">
+                <div>
+                  <div className="animate-pulse">Loading messages...</div>
+                </div>
+              </div>
+            ) : messages.length === 0 ? (
               <div className="flex h-full items-center justify-center text-center text-sm text-slate-400">
                 <div>
                   <p>No messages yet.</p>
@@ -221,6 +252,7 @@ export default function ChatWidget({ userId, userName }) {
             <div ref={messagesEndRef} />
           </div>
 
+          {/* Input Area */}
           <div className="border-t border-white/10 bg-[#111111] p-3">
             <div className="flex gap-2">
               <textarea
@@ -234,7 +266,7 @@ export default function ChatWidget({ userId, userName }) {
               />
               <button
                 onClick={handleSendMessage}
-                disabled={!inputMessage.trim()}
+                disabled={isSendDisabled}
                 className="flex h-10 w-10 items-center justify-center rounded-xl bg-lime-400 text-black transition hover:bg-lime-300 disabled:opacity-50"
               >
                 <Send size={18} />
