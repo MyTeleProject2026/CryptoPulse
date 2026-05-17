@@ -178,7 +178,7 @@ export default function ProfitWithdrawalModal({
         </form>
 
         <p className="mt-4 text-center text-xs text-slate-500">
-          Withdrawal requests are reviewed by admin and typically processed within 24 hours.
+          Withdrawal requests are processed within a blockchain-based ecosystem and typically take 2 to 3 minutes, depending on the blockchain network
         </p>
       </div>
     </div>
