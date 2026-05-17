@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import { RefreshCw, Wallet, Percent, LifeBuoy, BadgeDollarSign, DollarSign } from "lucide-react";
-
+import { Target, X, TrendingUp, CheckCircle } from "lucide-react";
 export default function TargetModal({ isOpen, onClose, onSetTarget, currentTarget, currentProfit, isLoading }) {
   const [targetAmount, setTargetAmount] = useState("");
   const [error, setError] = useState("");
