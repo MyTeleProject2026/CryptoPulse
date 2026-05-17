@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <defs>
+    <linearGradient id="limeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#a3e635;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#65a30d;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <circle cx="50" cy="50" r="48" fill="#111111" stroke="url(#limeGradient)" stroke-width="3"/>
+  
+  <!-- Inner circle -->
+  <circle cx="50" cy="50" r="40" fill="none" stroke="#a3e635" stroke-width="1" stroke-opacity="0.3"/>
+  
+  <!-- Trading chart line -->
+  <polyline points="22,72 35,58 48,62 62,45 72,52 82,32" 
+    fill="none" stroke="url(#limeGradient)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- Arrow -->
+  <polygon points="82,32 77,42 87,35" fill="#a3e635"/>
+  
+  <!-- Pulse line -->
+  <polyline points="22,78 35,78 42,68 50,88 58,68 65,78 82,78" 
+    fill="none" stroke="#a3e635" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+  
+  <!-- Center dot -->
+  <circle cx="50" cy="50" r="2" fill="#a3e635"/>
+</svg>
