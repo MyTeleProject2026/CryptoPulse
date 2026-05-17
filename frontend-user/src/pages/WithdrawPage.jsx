@@ -129,6 +129,12 @@ export default function WithdrawPage() {
 
   const isKycApproved = String(kycStatus || "").toLowerCase() === "approved";
 
+  // ✅ ADDED FROM VexaTrade: Check if target is achieved (MOVED UP - BEFORE isMainWithdrawDisabled)
+  const isTargetAchieved = useMemo(() => {
+    if (!hasTarget) return false;
+    return targetProgress.currentProfit >= targetProgress.targetAmount;
+  }, [hasTarget, targetProgress]);
+
   // ✅ ADDED FROM VexaTrade: Check if user has target AND target is NOT achieved
   // This determines if main withdraw should be disabled
   const isMainWithdrawDisabled = useMemo(() => {
@@ -175,12 +181,6 @@ export default function WithdrawPage() {
       console.error("Failed to refresh target:", err);
     }
   }
-
-  // ✅ ADDED FROM VexaTrade: Check if target is achieved
-  const isTargetAchieved = useMemo(() => {
-    if (!hasTarget) return false;
-    return targetProgress.currentProfit >= targetProgress.targetAmount;
-  }, [hasTarget, targetProgress]);
 
   // ✅ ADDED FROM VexaTrade: Open profit withdrawal modal
   function openProfitWithdrawal() {
