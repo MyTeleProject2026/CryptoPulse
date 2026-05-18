@@ -13,12 +13,10 @@ import {
   Clock3,
   Eye,
   CandlestickChart,
-  MessageCircle,  // ✅ ADDED: Import chat icon
+  MessageCircle,
 } from "lucide-react";
 import { adminApi, getApiErrorMessage } from "../../services/api";
-// ✅ ADDED: Import toast notification
 import { addToast, ToastContainer } from "../../components/ToastNotification";
-// ✅ ADDED: Import Admin Chat Panel
 import AdminChatPanel from "../../components/AdminChatPanel";
 
 function formatMoney(value) {
@@ -134,7 +132,6 @@ export default function AdminDashboardPage() {
     localStorage.getItem("admin_token") ||
     "";
 
-  // ✅ ADDED: Get admin info for chat
   const adminId = localStorage.getItem("adminId") || "1";
   const adminName = localStorage.getItem("adminName") || "Admin";
 
@@ -159,7 +156,25 @@ export default function AdminDashboardPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [showNotifications, setShowNotifications] = useState(false);
-  const [showChatPanel, setShowChatPanel] = useState(false);  // ✅ ADDED
+  const [showChatPanel, setShowChatPanel] = useState(false);
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
+
+  // Check for unread chat messages
+  useEffect(() => {
+    const checkUnreadMessages = () => {
+      try {
+        const conversations = JSON.parse(localStorage.getItem("chat_conversations_admin") || "[]");
+        const total = conversations.reduce((sum, conv) => sum + (conv.unread_admin || 0), 0);
+        setChatUnreadCount(total);
+      } catch (e) {
+        console.error("Error checking unread messages:", e);
+      }
+    };
+    
+    checkUnreadMessages();
+    const interval = setInterval(checkUnreadMessages, 3000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     loadDashboard();
@@ -232,18 +247,27 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="space-y-5 pb-20 xl:pb-5">
-      {/* ✅ ADDED: Toast Container */}
       <ToastContainer />
 
-      {/* ✅ ADDED: Chat Panel */}
-      <AdminChatPanel adminId={adminId} adminName={adminName} />
+      {/* Chat Panel - Now with proper open/close and delete functionality */}
+      <AdminChatPanel 
+        adminId={adminId} 
+        adminName={adminName} 
+        isOpen={showChatPanel}
+        onClose={() => setShowChatPanel(false)} 
+      />
 
-      {/* ✅ ADDED: Chat Toggle Button (floating) */}
+      {/* Chat Toggle Button with Unread Badge */}
       <button
-        onClick={() => setShowChatPanel(!showChatPanel)}
-        className="fixed bottom-20 right-4 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-lime-400 text-black shadow-lg transition hover:bg-lime-300 md:bottom-6"
+        onClick={() => setShowChatPanel(true)}
+        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-lime-400 to-green-500 text-black shadow-lg transition hover:scale-105 hover:shadow-lime-500/25"
       >
-        <MessageCircle size={20} />
+        <MessageCircle size={24} />
+        {chatUnreadCount > 0 && (
+          <span className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
+            {chatUnreadCount > 9 ? "9+" : chatUnreadCount}
+          </span>
+        )}
       </button>
 
       <section className="rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(34,197,94,0.10),transparent_18%),linear-gradient(180deg,#111827_0%,#020617_100%)] p-5 shadow-xl">
@@ -293,7 +317,6 @@ export default function AdminDashboardPage() {
         </div>
       </section>
 
-      {/* Notifications Panel */}
       {showNotifications && (
         <section className="rounded-[24px] border border-white/10 bg-slate-900/80 p-4 shadow-xl">
           <div className="mb-3 flex items-center justify-between">
