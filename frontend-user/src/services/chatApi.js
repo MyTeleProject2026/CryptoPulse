@@ -23,5 +23,6 @@ export const chatApi = {
   onNewMessage: (callback) => { if (socket) socket.on("new_message", callback); },
   onMessagesLoaded: (callback) => { if (socket) socket.on("messages_loaded", callback); },
   onUserConversations: (callback) => { if (socket) socket.on("user_conversations", callback); },
+  onMessageDeleted: (callback) => { if (socket) socket.on("message_deleted", callback); },
   off: (event) => { if (socket) socket.off(event); }
 };
