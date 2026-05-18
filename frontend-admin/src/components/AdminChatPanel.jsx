@@ -1,6 +1,5 @@
-// frontend-admin/src/components/AdminChatPanel.jsx
 import { useState, useEffect, useRef, useCallback } from "react";
-import { MessageCircle, Send, Users } from "lucide-react";
+import { MessageCircle, Send, Users, X, ChevronLeft, Trash2 } from "lucide-react";
 import { adminChatApi } from "../services/chatApi";
 
 function formatTime(date) {
@@ -15,15 +14,17 @@ function formatDate(date) {
   return d.toLocaleDateString();
 }
 
-export default function AdminChatPanel({ adminId, adminName }) {
+export default function AdminChatPanel({ adminId, adminName, isOpen, onClose }) {
   const [conversations, setConversations] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [showDeleteMenu, setShowDeleteMenu] = useState(null);
 
   const messagesEndRef = useRef(null);
+  const chatContainerRef = useRef(null);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -33,17 +34,58 @@ export default function AdminChatPanel({ adminId, adminName }) {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
+  // Load conversations from localStorage as fallback
+  const loadLocalConversations = useCallback(() => {
+    const stored = localStorage.getItem("chat_conversations_admin");
+    if (stored) {
+      const convs = JSON.parse(stored);
+      setConversations(convs);
+      setIsLoading(false);
+    }
+  }, []);
+
+  const saveConversations = useCallback((convs) => {
+    localStorage.setItem("chat_conversations_admin", JSON.stringify(convs));
+  }, []);
+
+  const loadLocalMessages = useCallback((conversationId) => {
+    const stored = localStorage.getItem(`chat_messages_${conversationId}`);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+    return [];
+  }, []);
+
+  const saveLocalMessages = useCallback((conversationId, msgs) => {
+    localStorage.setItem(`chat_messages_${conversationId}`, JSON.stringify(msgs));
+  }, []);
+
+  // Delete message function
+  const handleDeleteMessage = useCallback((messageId) => {
+    if (!selectedConversation) return;
+    
+    setMessages(prev => {
+      const updated = prev.filter(msg => msg.id !== messageId);
+      saveLocalMessages(selectedConversation.id, updated);
+      return updated;
+    });
+    
+    if (adminChatApi.deleteMessage) {
+      adminChatApi.deleteMessage(selectedConversation.id, messageId);
+    }
+    
+    setShowDeleteMenu(null);
+  }, [selectedConversation, saveLocalMessages]);
+
   useEffect(() => {
     if (!adminId) return;
 
     const token = localStorage.getItem("adminToken") || localStorage.getItem("admin_token") || "";
     
-    const socket = adminChatApi.connect(adminId, adminName, token);
+    adminChatApi.connect(adminId, adminName, token);
     setIsConnected(true);
 
-    // Listen for new messages
     adminChatApi.onNewMessage((data) => {
-      // Update conversations list
       setConversations(prev => {
         const updated = prev.map(conv => 
           conv.id === data.conversationId 
@@ -53,43 +95,62 @@ export default function AdminChatPanel({ adminId, adminName }) {
         const convIndex = updated.findIndex(c => c.id === data.conversationId);
         if (convIndex !== -1) {
           const [moved] = updated.splice(convIndex, 1);
+          saveConversations([moved, ...updated]);
           return [moved, ...updated];
         }
+        saveConversations(updated);
         return updated;
       });
 
-      // If this is the selected conversation, add message to current view
       if (selectedConversation?.id === data.conversationId) {
-        setMessages(prev => [...prev, {
-          id: data.id,
-          message: data.message,
-          senderType: data.senderType,
-          createdAt: data.createdAt,
-          userName: data.userName
-        }]);
-        adminChatApi.markRead(data.conversationId);
-        
-        setConversations(prev => prev.map(conv =>
-          conv.id === data.conversationId ? { ...conv, unread_admin: 0 } : conv
-        ));
+        setMessages(prev => {
+          const newMsgs = [...prev, {
+            id: data.id,
+            message: data.message,
+            senderType: data.senderType,
+            createdAt: data.createdAt,
+            userName: data.userName
+          }];
+          saveLocalMessages(data.conversationId, newMsgs);
+          return newMsgs;
+        });
+        adminChatApi.markRead?.(data.conversationId);
+        setConversations(prev => {
+          const updated = prev.map(conv => conv.id === data.conversationId ? { ...conv, unread_admin: 0 } : conv);
+          saveConversations(updated);
+          return updated;
+        });
       } else {
-        // Update unread count for non-selected conversation
-        setConversations(prev => prev.map(conv =>
-          conv.id === data.conversationId ? { ...conv, unread_admin: (conv.unread_admin || 0) + 1 } : conv
-        ));
+        setConversations(prev => {
+          const updated = prev.map(conv => conv.id === data.conversationId ? { ...conv, unread_admin: (conv.unread_admin || 0) + 1 } : conv);
+          saveConversations(updated);
+          return updated;
+        });
       }
     });
 
-    // Load conversations list
+    // Listen for message deletion
+    adminChatApi.onMessageDeleted?.((data) => {
+      if (selectedConversation?.id === data.conversationId) {
+        setMessages(prev => {
+          const updated = prev.filter(msg => msg.id !== data.messageId);
+          saveLocalMessages(data.conversationId, updated);
+          return updated;
+        });
+      }
+    });
+
     adminChatApi.onAdminConversations((data) => {
       setConversations(data.conversations || []);
+      saveConversations(data.conversations || []);
       setIsLoading(false);
     });
 
-    // Load messages for selected conversation
     adminChatApi.onMessagesLoaded((data) => {
-      console.log("Messages loaded:", data);
       setMessages(data.messages || []);
+      if (selectedConversation) {
+        saveLocalMessages(selectedConversation.id, data.messages || []);
+      }
       scrollToBottom();
     });
 
@@ -97,55 +158,65 @@ export default function AdminChatPanel({ adminId, adminName }) {
       adminChatApi.off("new_message");
       adminChatApi.off("admin_conversations");
       adminChatApi.off("messages_loaded");
+      adminChatApi.off("message_deleted");
     };
-  }, [adminId, adminName]);
+  }, [adminId, adminName, selectedConversation, saveConversations, loadLocalConversations, saveLocalMessages, scrollToBottom]);
 
-  // ✅ FIXED: Handle selecting a conversation - THIS IS WHERE MESSAGES SHOULD LOAD
   const handleSelectConversation = (conversation) => {
     setSelectedConversation(conversation);
-    setMessages([]); // Clear previous messages while loading
+    setShowDeleteMenu(null);
     
-    // ✅ IMPORTANT: Request messages for this conversation
-    const socket = adminChatApi.getSocket();
-    if (socket && adminChatApi.isConnected()) {
-      console.log("Requesting messages for conversation:", conversation.id);
-      socket.emit("get_messages", { conversationId: conversation.id });
+    const localMsgs = loadLocalMessages(conversation.id);
+    if (localMsgs.length > 0) {
+      setMessages(localMsgs);
     }
     
-    // Mark as read
-    const socket2 = adminChatApi.getSocket();
-    if (socket2 && adminChatApi.isConnected()) {
-      socket2.emit("mark_read", { conversationId: conversation.id });
+    if (adminChatApi.getMessages) {
+      setMessages([]);
+      adminChatApi.getMessages(conversation.id);
+      adminChatApi.markRead?.(conversation.id);
     }
     
-    // Update local unread count
-    setConversations(prev => prev.map(conv =>
-      conv.id === conversation.id ? { ...conv, unread_admin: 0 } : conv
-    ));
+    setConversations(prev => {
+      const updated = prev.map(conv => conv.id === conversation.id ? { ...conv, unread_admin: 0 } : conv);
+      saveConversations(updated);
+      return updated;
+    });
   };
 
   const handleSendMessage = () => {
     if (!inputMessage.trim() || !selectedConversation) return;
     
-    const socket = adminChatApi.getSocket();
-    if (socket && adminChatApi.isConnected()) {
-      socket.emit("send_message", { 
-        conversationId: selectedConversation.id, 
-        message: inputMessage.trim() 
-      });
-      
-      // Optimistically add message to UI
-      setMessages(prev => [...prev, {
-        id: Date.now(),
-        message: inputMessage.trim(),
-        senderType: "admin",
-        createdAt: new Date().toISOString(),
-        userName: adminName
-      }]);
-      
-      setInputMessage("");
-      scrollToBottom();
+    const newMessage = {
+      id: Date.now(),
+      message: inputMessage.trim(),
+      senderType: "admin",
+      createdAt: new Date().toISOString(),
+      userName: adminName
+    };
+    
+    setMessages(prev => {
+      const newMsgs = [...prev, newMessage];
+      saveLocalMessages(selectedConversation.id, newMsgs);
+      return newMsgs;
+    });
+    
+    setConversations(prev => {
+      const updated = prev.map(conv => 
+        conv.id === selectedConversation.id 
+          ? { ...conv, last_message: inputMessage.trim(), last_message_time: new Date().toISOString() }
+          : conv
+      );
+      saveConversations(updated);
+      return updated;
+    });
+    
+    if (adminChatApi.sendMessage) {
+      adminChatApi.sendMessage(selectedConversation.id, inputMessage.trim());
     }
+    
+    setInputMessage("");
+    scrollToBottom();
   };
 
   const handleKeyPress = (e) => {
@@ -155,163 +226,212 @@ export default function AdminChatPanel({ adminId, adminName }) {
     }
   };
 
+  // Create demo conversations if none exist
+  useEffect(() => {
+    if (conversations.length === 0 && !isLoading) {
+      const demoConversations = [
+        {
+          id: 1,
+          user_id: 101,
+          user_name: "Alice Johnson",
+          user_email: "alice@example.com",
+          user_uid: "USR001",
+          last_message: "Need help with my deposit",
+          last_message_time: new Date().toISOString(),
+          unread_admin: 0
+        },
+        {
+          id: 2,
+          user_id: 102,
+          user_name: "Bob Miller",
+          user_email: "bob@example.com",
+          user_uid: "USR002",
+          last_message: "When will my withdrawal be processed?",
+          last_message_time: new Date(Date.now() - 3600000).toISOString(),
+          unread_admin: 1
+        },
+        {
+          id: 3,
+          user_id: 103,
+          user_name: "Charlie Chen",
+          user_email: "charlie@example.com",
+          user_uid: "USR003",
+          last_message: "KYC verification status?",
+          last_message_time: new Date(Date.now() - 7200000).toISOString(),
+          unread_admin: 0
+        }
+      ];
+      setConversations(demoConversations);
+      saveConversations(demoConversations);
+      setIsLoading(false);
+    }
+  }, [conversations.length, isLoading, saveConversations]);
+
   const totalUnread = conversations.reduce((sum, conv) => sum + (conv.unread_admin || 0), 0);
 
-  return (
-    <div className="fixed bottom-0 right-0 z-50 flex h-[90vh] w-full max-w-4xl flex-col bg-[#0a0e1a] border border-white/10 rounded-t-2xl shadow-2xl md:bottom-4 md:right-4 md:rounded-2xl overflow-hidden">
-      <div className="flex items-center justify-between border-b border-white/10 bg-[#111111] px-4 py-3">
-        <div className="flex items-center gap-2">
-          <Users size={18} className="text-lime-400" />
-          <span className="font-semibold text-white">Support Chat Panel</span>
-          {isConnected && (
-            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-          )}
-          {totalUnread > 0 && (
-            <span className="ml-2 rounded-full bg-red-500 px-2 py-0.5 text-xs text-white">
-              {totalUnread} new
-            </span>
-          )}
-        </div>
-      </div>
+  if (!isOpen) return null;
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* Conversations List */}
-        <div className="w-80 border-r border-white/10 flex flex-col">
-          <div className="p-3 border-b border-white/10">
-            <h3 className="text-sm font-semibold text-white">Active Conversations</h3>
-            <p className="text-xs text-slate-400 mt-1">
-              {conversations.length} chat{conversations.length !== 1 ? "s" : ""}
-            </p>
-          </div>
-          <div className="flex-1 overflow-y-auto">
-            {isLoading ? (
-              <div className="p-4 text-center text-sm text-slate-400">Loading...</div>
-            ) : conversations.length === 0 ? (
-              <div className="p-4 text-center text-sm text-slate-400">No active conversations</div>
-            ) : (
-              conversations.map((conv) => (
-                <button
-                  key={conv.id}
-                  onClick={() => handleSelectConversation(conv)}
-                  className={`w-full p-3 text-left transition ${
-                    selectedConversation?.id === conv.id
-                      ? "bg-lime-500/10 border-l-2 border-lime-400"
-                      : "hover:bg-white/5"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-white text-sm">
-                      {conv.user_name || `User #${conv.user_id}`}
-                    </span>
-                    {conv.unread_admin > 0 && (
-                      <span className="rounded-full bg-red-500 px-2 py-0.5 text-xs text-white">
-                        {conv.unread_admin}
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-1 text-xs text-slate-400 truncate">
-                    {conv.user_email || ""}
-                  </div>
-                  <div className="mt-1 text-xs text-slate-500 truncate">
-                    UID: {conv.user_uid || "-"}
-                  </div>
-                  {conv.last_message && (
-                    <div className="mt-2 text-xs text-slate-500 truncate">
-                      {conv.last_message}
-                    </div>
-                  )}
-                  {conv.last_message_time && (
-                    <div className="mt-1 text-[10px] text-slate-600">
-                      {formatDate(conv.last_message_time)} {formatTime(conv.last_message_time)}
-                    </div>
-                  )}
-                </button>
-              ))
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+      <div className="flex h-[90vh] w-full max-w-6xl flex-col bg-[#0a0e1a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
+        <div className="flex items-center justify-between border-b border-white/10 bg-[#111111] px-4 py-3">
+          <div className="flex items-center gap-2">
+            <Users size={18} className="text-lime-400" />
+            <span className="font-semibold text-white">Support Chat Panel</span>
+            {isConnected && <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />}
+            {totalUnread > 0 && (
+              <span className="ml-2 rounded-full bg-red-500 px-2 py-0.5 text-xs text-white">
+                {totalUnread} new
+              </span>
             )}
           </div>
+          <button
+            onClick={() => onClose?.()}
+            className="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition"
+          >
+            <X size={20} />
+          </button>
         </div>
 
-        {/* Messages Area */}
-        <div className="flex-1 flex flex-col">
-          {selectedConversation ? (
-            <>
-              <div className="border-b border-white/10 p-3 bg-[#0f0f0f]">
-                <div className="font-semibold text-white">
-                  {selectedConversation.user_name || `User #${selectedConversation.user_id}`}
-                </div>
-                <div className="text-xs text-slate-400">
-                  {selectedConversation.user_email || ""} • UID: {selectedConversation.user_uid || "-"}
-                </div>
-              </div>
+        {selectedConversation && (
+          <button
+            onClick={() => setSelectedConversation(null)}
+            className="lg:hidden flex items-center gap-2 p-3 border-b border-white/10 bg-[#0f0f0f] text-white hover:bg-white/5"
+          >
+            <ChevronLeft size={18} />
+            <span>Back to conversations</span>
+          </button>
+        )}
 
-              <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                {messages.length === 0 ? (
-                  <div className="flex h-full items-center justify-center text-center text-sm text-slate-400">
-                    <div>
-                      <MessageCircle size={32} className="mx-auto mb-2 opacity-30" />
-                      <p>No messages yet</p>
-                      <p className="mt-1 text-xs">Send a message to start the conversation</p>
+        <div className="flex flex-1 overflow-hidden flex-col lg:flex-row">
+          <div className={`${selectedConversation ? "hidden lg:flex" : "flex"} lg:w-80 w-full border-r border-white/10 flex-col`}>
+            <div className="p-3 border-b border-white/10">
+              <h3 className="text-sm font-semibold text-white">Active Conversations</h3>
+              <p className="text-xs text-slate-400 mt-1">{conversations.length} chat{conversations.length !== 1 ? "s" : ""}</p>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {isLoading ? (
+                <div className="p-4 text-center text-sm text-slate-400">Loading...</div>
+              ) : conversations.length === 0 ? (
+                <div className="p-4 text-center text-sm text-slate-400">No active conversations</div>
+              ) : (
+                conversations.map((conv) => (
+                  <button
+                    key={conv.id}
+                    onClick={() => handleSelectConversation(conv)}
+                    className={`w-full p-3 text-left transition ${selectedConversation?.id === conv.id ? "bg-lime-500/10 border-l-2 border-lime-400" : "hover:bg-white/5"}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-white text-sm">{conv.user_name || `User #${conv.user_id}`}</span>
+                      {conv.unread_admin > 0 && (
+                        <span className="rounded-full bg-red-500 px-2 py-0.5 text-xs text-white">{conv.unread_admin}</span>
+                      )}
+                    </div>
+                    <div className="mt-1 text-xs text-slate-400 truncate">{conv.user_email || ""}</div>
+                    <div className="mt-1 text-xs text-slate-500 truncate">UID: {conv.user_uid || "-"}</div>
+                    {conv.last_message && (
+                      <div className="mt-2 text-xs text-slate-500 truncate">{conv.last_message}</div>
+                    )}
+                    {conv.last_message_time && (
+                      <div className="mt-1 text-[10px] text-slate-600">
+                        {formatDate(conv.last_message_time)} {formatTime(conv.last_message_time)}
+                      </div>
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="flex-1 flex flex-col">
+            {selectedConversation ? (
+              <>
+                <div className="border-b border-white/10 p-3 bg-[#0f0f0f] flex items-center justify-between">
+                  <div>
+                    <div className="font-semibold text-white">{selectedConversation.user_name || `User #${selectedConversation.user_id}`}</div>
+                    <div className="text-xs text-slate-400">
+                      {selectedConversation.user_email || ""} • UID: {selectedConversation.user_uid || "-"}
                     </div>
                   </div>
-                ) : (
-                  messages.map((msg) => (
-                    <div
-                      key={msg.id}
-                      className={`flex ${msg.senderType === "admin" ? "justify-end" : "justify-start"}`}
-                    >
-                      <div
-                        className={`max-w-[80%] rounded-2xl px-4 py-2 ${
-                          msg.senderType === "admin"
-                            ? "bg-lime-400 text-black"
-                            : "bg-[#1a1e2a] text-white"
-                        }`}
-                      >
-                        {msg.senderType === "user" && (
-                          <p className="mb-1 text-xs text-lime-400">
-                            {msg.userName || selectedConversation.user_name || "User"}
-                          </p>
-                        )}
-                        <p className="text-sm break-words">{msg.message}</p>
-                        <p className={`mt-1 text-[10px] ${msg.senderType === "admin" ? "text-black/60" : "text-slate-400"}`}>
-                          {formatTime(msg.created_at || msg.createdAt)}
-                        </p>
+                </div>
+
+                <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3">
+                  {messages.length === 0 ? (
+                    <div className="flex h-full items-center justify-center text-center text-sm text-slate-400">
+                      <div>
+                        <MessageCircle size={32} className="mx-auto mb-2 opacity-30" />
+                        <p>No messages yet</p>
+                        <p className="mt-1 text-xs">Send a message to start the conversation</p>
                       </div>
                     </div>
-                  ))
-                )}
-                <div ref={messagesEndRef} />
-              </div>
+                  ) : (
+                    messages.map((msg) => (
+                      <div key={msg.id} className={`group relative flex ${msg.senderType === "admin" ? "justify-end" : "justify-start"}`}>
+                        <div className={`max-w-[80%] rounded-2xl px-4 py-2 ${msg.senderType === "admin" ? "bg-lime-400 text-black" : "bg-[#1a1e2a] text-white"}`}>
+                          {msg.senderType === "user" && (
+                            <p className="mb-1 text-xs text-lime-400">{msg.userName || selectedConversation.user_name || "User"}</p>
+                          )}
+                          <p className="text-sm break-words">{msg.message}</p>
+                          <p className={`mt-1 text-[10px] ${msg.senderType === "admin" ? "text-black/60" : "text-slate-400"}`}>
+                            {formatTime(msg.created_at || msg.createdAt)}
+                          </p>
+                        </div>
+                        <div className="absolute -right-8 top-2 opacity-0 group-hover:opacity-100 transition">
+                          <button
+                            onClick={() => setShowDeleteMenu(showDeleteMenu === msg.id ? null : msg.id)}
+                            className="p-1 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                          {showDeleteMenu === msg.id && (
+                            <div className="absolute right-0 mt-1 bg-[#1a1e2a] border border-white/10 rounded-lg shadow-lg z-10">
+                              <button
+                                onClick={() => handleDeleteMessage(msg.id)}
+                                className="flex items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 rounded-lg w-full"
+                              >
+                                <Trash2 size={12} />
+                                Delete this message
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
 
-              <div className="border-t border-white/10 bg-[#111111] p-3">
-                <div className="flex gap-2">
-                  <textarea
-                    value={inputMessage}
-                    onChange={(e) => setInputMessage(e.target.value)}
-                    onKeyDown={handleKeyPress}
-                    placeholder="Type your response..."
-                    className="flex-1 resize-none rounded-xl border border-white/10 bg-[#0a0e1a] px-3 py-2 text-sm text-white outline-none focus:border-lime-400"
-                    rows={2}
-                    style={{ minHeight: "40px", maxHeight: "100px" }}
-                  />
-                  <button
-                    onClick={handleSendMessage}
-                    disabled={!inputMessage.trim()}
-                    className="flex h-10 w-10 items-center justify-center rounded-xl bg-lime-400 text-black transition hover:bg-lime-300 disabled:opacity-50"
-                  >
-                    <Send size={18} />
-                  </button>
+                <div className="border-t border-white/10 bg-[#111111] p-3">
+                  <div className="flex gap-2">
+                    <textarea
+                      value={inputMessage}
+                      onChange={(e) => setInputMessage(e.target.value)}
+                      onKeyDown={handleKeyPress}
+                      placeholder="Type your response..."
+                      className="flex-1 resize-none rounded-xl border border-white/10 bg-[#0a0e1a] px-3 py-2 text-sm text-white outline-none focus:border-lime-400"
+                      rows={2}
+                      style={{ minHeight: "40px", maxHeight: "100px" }}
+                    />
+                    <button
+                      onClick={handleSendMessage}
+                      disabled={!inputMessage.trim()}
+                      className="flex h-10 w-10 items-center justify-center rounded-xl bg-lime-400 text-black transition hover:bg-lime-300 disabled:opacity-50"
+                    >
+                      <Send size={18} />
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="flex h-full items-center justify-center text-center text-sm text-slate-400">
+                <div>
+                  <MessageCircle size={32} className="mx-auto mb-2 opacity-30" />
+                  <p>Select a conversation</p>
+                  <p className="mt-1 text-xs">Choose a user from the left panel to start chatting</p>
                 </div>
               </div>
-            </>
-          ) : (
-            <div className="flex h-full items-center justify-center text-center text-sm text-slate-400">
-              <div>
-                <MessageCircle size={32} className="mx-auto mb-2 opacity-30" />
-                <p>Select a conversation</p>
-                <p className="mt-1 text-xs">Choose a user from the left panel to start chatting</p>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>
