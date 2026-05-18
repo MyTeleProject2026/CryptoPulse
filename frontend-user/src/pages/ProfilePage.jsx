@@ -15,11 +15,10 @@ import {
   CircleMinus,
   Download,
   Upload,
-  MessageCircle,  // ✅ ADDED: Import chat icon
+  MessageCircle,
 } from "lucide-react";
 import { userApi, getApiErrorMessage } from "../services/api";
 import { getFullImageUrl } from "../utils/image";
-// ✅ ADDED: Import Chat Widget
 import ChatWidget from "../components/ChatWidget";
 
 function getKycText(status) {
@@ -96,6 +95,7 @@ export default function ProfilePage() {
   const [profileSaving, setProfileSaving] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [showChat, setShowChat] = useState(false);
 
   const [editForm, setEditForm] = useState({
     name: "",
@@ -103,7 +103,6 @@ export default function ProfilePage() {
     avatarPreview: "",
   });
 
-  // ✅ ADDED: Get user info for chat widget
   const userId = profile?.id || null;
   const userName = profile?.name || profile?.email?.split("@")[0] || "User";
 
@@ -122,7 +121,7 @@ export default function ProfilePage() {
         {};
 
       const nextProfile = {
-        id: user.id || null,  // ✅ ADDED: Store user id
+        id: user.id || null,
         name: user.name || "",
         email: user.email || "",
         uid: user.uid || "",
@@ -241,7 +240,7 @@ export default function ProfilePage() {
 
       const updatedProfile = {
         ...profile,
-        id: profile.id,  // ✅ ADDED: Keep id
+        id: profile.id,
         ...(updateRes?.data?.data || {}),
         name,
         avatar_url: avatarUrl,
@@ -282,8 +281,13 @@ export default function ProfilePage() {
 
   return (
     <div className="space-y-5 bg-black px-2 pb-24 pt-3 sm:px-6 xl:pb-8">
-      {/* ✅ ADDED: Chat Widget */}
-      <ChatWidget userId={profile.id} userName={profile.name || profile.email?.split("@")[0]} />
+      {/* Chat Widget - Now with proper open/close and delete functionality */}
+      {profile?.id && (
+        <ChatWidget 
+          userId={profile.id.toString()} 
+          userName={profile.name || profile.email?.split("@")[0] || "User"} 
+        />
+      )}
 
       <section className="rounded-[30px] border border-white/10 bg-[#111111] p-5 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
@@ -342,8 +346,7 @@ export default function ProfilePage() {
       >
         <div className="grid grid-cols-4 gap-2 sm:gap-4">
           <QuickIcon icon={Headphones} label="Get help" onClick={() => navigate("/support")} />
-          {/* ✅ ADDED: Chat icon in Shortcuts */}
-          <QuickIcon icon={MessageCircle} label="Live Chat" onClick={() => {}} />
+          <QuickIcon icon={MessageCircle} label="Live Chat" onClick={() => setShowChat(true)} />
           <QuickIcon icon={Gift} label="Referral" onClick={() => navigate("/referral")} />
           <QuickIcon icon={FileText} label="Legal Docs" onClick={() => navigate("/legal-documents")} />
           <QuickIcon icon={ArrowRightLeft} label="Trading" onClick={() => navigate("/trade")} />
