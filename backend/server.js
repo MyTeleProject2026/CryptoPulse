@@ -9293,8 +9293,9 @@ server.listen(PORT, async () => {
     } else {
       console.log(`⚠️ Mail service not configured. Email features will not work.`);
     }
-  } catch (error) { console.error("❌ MySQL connection failed:", error.message);
-}
+  } catch (error) {
+    console.error("❌ MySQL connection failed:", error.message);
+  }
 });
 
 setInterval(() => {
@@ -9302,4 +9303,3 @@ setInterval(() => {
     console.error("Auto trade settlement failed:", error.message);
   });
 }, 1000);
-} 
