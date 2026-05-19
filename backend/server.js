@@ -9302,3 +9302,4 @@ setInterval(() => {
     console.error("Auto trade settlement failed:", error.message);
   });
 }, 1000);
+} 
