@@ -156,6 +156,7 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 // Create HTTP server for Socket.io
 const server = http.createServer(app);
 
+// Initialize Socket.io with CORS
 const io = socketIo(server, {
   cors: {
     origin: allowedOrigins,
@@ -164,33 +165,49 @@ const io = socketIo(server, {
   }
 });
 
+// Store connected users
 const connectedUsers = new Map();
 
+// Socket.io connection handling
 io.on('connection', (socket) => {
   console.log('New client connected:', socket.id);
 
   socket.on('authenticate', (data) => {
     const { userId, role, name } = data;
+    
     if (!userId) return;
-    connectedUsers.set(userId, { socketId: socket.id, role: role || 'user', name: name || 'User' });
+    
+    connectedUsers.set(userId, {
+      socketId: socket.id,
+      role: role || 'user',
+      name: name || 'User'
+    });
+    
     socket.userId = userId;
     socket.role = role || 'user';
+    
+    console.log(`Authenticated: ${role || 'user'} ${userId} (${name})`);
+    
     if (role === 'admin') {
       socket.join('admin_room');
       sendActiveConversationsToAdmin(socket);
     }
   });
 
+  // Send message
   socket.on('send_message', async (data) => {
     try {
       const { conversationId, message } = data;
       const senderId = socket.userId;
       const senderRole = socket.role;
+      
       if (!senderId || !message || !message.trim()) return;
       
       const connection = await pool.getConnection();
+      
       try {
         let convId = conversationId;
+        
         if (!convId) {
           const [result] = await connection.execute(
             `INSERT INTO chat_conversations (user_id, admin_id, status, last_message, last_message_time, created_at, updated_at)
@@ -198,9 +215,13 @@ io.on('connection', (socket) => {
             [senderId, message.trim()]
           );
           convId = result.insertId;
+          // ✅ Emit conversation_created event so user knows the conversation ID
+          socket.emit('conversation_created', { conversationId: convId });
         } else {
           await connection.execute(
-            `UPDATE chat_conversations SET last_message = ?, last_message_time = NOW(), updated_at = NOW() WHERE id = ?`,
+            `UPDATE chat_conversations 
+             SET last_message = ?, last_message_time = NOW(), updated_at = NOW()
+             WHERE id = ?`,
             [message.trim(), convId]
           );
         }
@@ -212,7 +233,11 @@ io.on('connection', (socket) => {
         );
         
         if (senderRole === 'user') {
-          await connection.execute(`UPDATE chat_conversations SET unread_admin = unread_admin + 1, updated_at = NOW() WHERE id = ?`, [convId]);
+           await connection.execute(
+             `UPDATE chat_conversations SET unread_admin = unread_admin + 1, last_message = ?, last_message_id = ?, updated_at = NOW() WHERE id = ?`,
+             [message.trim(), msgResult.insertId, convId]
+           );
+          
           io.to('admin_room').emit('new_message', {
             id: msgResult.insertId,
             conversationId: convId,
@@ -223,10 +248,19 @@ io.on('connection', (socket) => {
             userName: connectedUsers.get(senderId)?.name || 'User'
           });
         } else {
-          const [convRows] = await connection.execute(`SELECT user_id FROM chat_conversations WHERE id = ?`, [convId]);
+          const [convRows] = await connection.execute(
+            `SELECT user_id FROM chat_conversations WHERE id = ?`,
+            [convId]
+          );
+          
           if (convRows.length > 0) {
             const userId = convRows[0].user_id;
-            await connection.execute(`UPDATE chat_conversations SET unread_user = unread_user + 1, updated_at = NOW() WHERE id = ?`, [convId]);
+            
+            await connection.execute(
+              `UPDATE chat_conversations SET unread_user = unread_user + 1, last_message = ?, last_message_id = ?, updated_at = NOW() WHERE id = ?`,
+              [message.trim(), msgResult.insertId, convId]
+            );
+            
             const userSocket = connectedUsers.get(userId);
             if (userSocket) {
               io.to(userSocket.socketId).emit('new_message', {
@@ -240,66 +274,117 @@ io.on('connection', (socket) => {
             }
           }
         }
-        socket.emit('message_sent', { id: msgResult.insertId, conversationId: convId, message: message.trim(), createdAt: new Date().toISOString() });
-      } finally { connection.release(); }
-    } catch (error) { console.error('Send message error:', error); socket.emit('message_error', { error: error.message }); }
+        
+        socket.emit('message_sent', {
+          id: msgResult.insertId,
+          conversationId: convId,
+          message: message.trim(),
+          createdAt: new Date().toISOString()
+        });
+        
+      } finally {
+        connection.release();
+      }
+    } catch (error) {
+      console.error('Send message error:', error);
+      socket.emit('message_error', { error: error.message });
+    }
   });
 
+  // Mark messages as read
   socket.on('mark_read', async (data) => {
     try {
       const { conversationId } = data;
       const userId = socket.userId;
       const role = socket.role;
+      
       if (!conversationId || !userId) return;
+      
       const connection = await pool.getConnection();
+      
       try {
         if (role === 'admin') {
           await connection.execute(`UPDATE chat_conversations SET unread_admin = 0 WHERE id = ?`, [conversationId]);
         } else {
           await connection.execute(`UPDATE chat_conversations SET unread_user = 0 WHERE id = ?`, [conversationId]);
-          await connection.execute(`UPDATE chat_messages SET is_read = 1 WHERE conversation_id = ? AND sender_type = 'admin' AND is_read = 0`, [conversationId]);
+          await connection.execute(
+            `UPDATE chat_messages SET is_read = 1 
+             WHERE conversation_id = ? AND sender_type = 'admin' AND is_read = 0`,
+            [conversationId]
+          );
         }
         socket.emit('read_confirmed', { conversationId });
-      } finally { connection.release(); }
-    } catch (error) { console.error('Mark read error:', error); }
+      } finally {
+        connection.release();
+      }
+    } catch (error) {
+      console.error('Mark read error:', error);
+    }
   });
 
+  // Get conversations for user
   socket.on('get_conversations', async () => {
     const userId = socket.userId;
     if (!userId) return;
+    
     const connection = await pool.getConnection();
     try {
       const [conversations] = await connection.execute(
         `SELECT id, user_id, status, unread_user, last_message, last_message_time, created_at, updated_at
-         FROM chat_conversations WHERE user_id = ? AND status = 'active' ORDER BY updated_at DESC LIMIT 10`,
+         FROM chat_conversations
+         WHERE user_id = ? AND status = 'active'
+         ORDER BY updated_at DESC
+         LIMIT 10`,
         [userId]
       );
       socket.emit('user_conversations', { conversations });
-    } finally { connection.release(); }
+    } finally {
+      connection.release();
+    }
   });
 
-  // ✅ CRITICAL ADDITION - Get messages for a conversation
+  // Get messages for a specific conversation
   socket.on('get_messages', async (data) => {
     const { conversationId } = data;
     const userId = socket.userId;
     const role = socket.role;
+    
     if (!conversationId || !userId) return;
+    
     const connection = await pool.getConnection();
     try {
       let hasAccess = false;
+      
       if (role === 'admin') {
-        const [rows] = await connection.execute(`SELECT id FROM chat_conversations WHERE id = ?`, [conversationId]);
+        const [rows] = await connection.execute(
+          `SELECT id FROM chat_conversations WHERE id = ?`,
+          [conversationId]
+        );
         hasAccess = rows.length > 0;
       } else {
-        const [rows] = await connection.execute(`SELECT id FROM chat_conversations WHERE id = ? AND user_id = ?`, [conversationId, userId]);
+        const [rows] = await connection.execute(
+          `SELECT id FROM chat_conversations WHERE id = ? AND user_id = ?`,
+          [conversationId, userId]
+        );
         hasAccess = rows.length > 0;
       }
-      if (!hasAccess) { socket.emit('error', { message: 'Access denied' }); return; }
+      
+      if (!hasAccess) {
+        socket.emit('error', { message: 'Access denied' });
+        return;
+      }
+      
       const [messages] = await connection.execute(
         `SELECT id, conversation_id, sender_id, sender_type, message, is_read, created_at
-         FROM chat_messages WHERE conversation_id = ? ORDER BY created_at ASC LIMIT 200`,
+         FROM chat_messages
+         WHERE conversation_id = ?
+         ORDER BY created_at ASC
+         LIMIT 200`,
         [conversationId]
       );
+      
+      console.log(`Sending ${messages.length} messages for conversation ${conversationId}`);
+      
       socket.emit('messages_loaded', {
         conversationId,
         messages: messages.map(msg => ({
@@ -311,11 +396,15 @@ io.on('connection', (socket) => {
           createdAt: msg.created_at
         }))
       });
-    } catch (error) { console.error('Get messages error:', error); socket.emit('error', { message: error.message }); }
-    finally { connection.release(); }
+    } catch (error) {
+      console.error('Get messages error:', error);
+      socket.emit('error', { message: error.message });
+    } finally {
+      connection.release();
+    }
   });
 
-  // ✅ ADD THIS: DELETE MESSAGE HANDLER
+  // DELETE MESSAGE HANDLER
   socket.on('delete_message', async (data) => {
     try {
       const { conversationId, messageId } = data;
@@ -330,20 +419,18 @@ io.on('connection', (socket) => {
       const connection = await pool.getConnection();
       
       try {
-        // Check if user has permission to delete (admin only)
         let hasPermission = false;
         
         if (senderRole === 'admin') {
-          hasPermission = true; // Admin can delete any message
+          hasPermission = true;
         } else {
-          // User can only delete their own messages that are not read yet
           const [msgRows] = await connection.execute(
             `SELECT sender_id, sender_type, is_read FROM chat_messages WHERE id = ?`,
             [messageId]
           );
           
           if (msgRows.length > 0 && msgRows[0].sender_type === 'user' && msgRows[0].sender_id === senderId) {
-            hasPermission = msgRows[0].is_read === 0; // Can only delete unread messages
+            hasPermission = msgRows[0].is_read === 0;
           }
         }
         
@@ -352,13 +439,8 @@ io.on('connection', (socket) => {
           return;
         }
         
-        // Delete the message from database
-        await connection.execute(
-          `DELETE FROM chat_messages WHERE id = ?`,
-          [messageId]
-        );
+        await connection.execute(`DELETE FROM chat_messages WHERE id = ?`, [messageId]);
         
-        // Update last_message in conversation if needed
         const [lastMsgRows] = await connection.execute(
           `SELECT id, message FROM chat_messages WHERE conversation_id = ? ORDER BY created_at DESC LIMIT 1`,
           [conversationId]
@@ -376,7 +458,6 @@ io.on('connection', (socket) => {
         
         console.log(`Message ${messageId} deleted from conversation ${conversationId} by ${senderRole}`);
         
-        // Get conversation details to notify both participants
         const [convRows] = await connection.execute(
           `SELECT user_id FROM chat_conversations WHERE id = ?`,
           [conversationId]
@@ -385,7 +466,6 @@ io.on('connection', (socket) => {
         if (convRows.length > 0) {
           const userId = convRows[0].user_id;
           
-          // Notify admin room
           io.to('admin_room').emit('message_deleted', {
             conversationId,
             messageId,
@@ -393,7 +473,6 @@ io.on('connection', (socket) => {
             deletedAt: new Date().toISOString()
           });
           
-          // Notify user if online
           const userSocket = connectedUsers.get(userId);
           if (userSocket) {
             io.to(userSocket.socketId).emit('message_deleted', {
@@ -405,7 +484,6 @@ io.on('connection', (socket) => {
           }
         }
         
-        // Also emit to the sender
         socket.emit('message_deleted', {
           conversationId,
           messageId,
@@ -422,7 +500,7 @@ io.on('connection', (socket) => {
     }
   });
   
-  // ✅ ADD THIS: Join conversation room for real-time updates
+  // Join conversation room for real-time updates
   socket.on('join_conversation', (conversationId) => {
     if (conversationId) {
       socket.join(`conversation_${conversationId}`);
@@ -430,7 +508,7 @@ io.on('connection', (socket) => {
     }
   });
   
-  // ✅ ADD THIS: Leave conversation room
+  // Leave conversation room
   socket.on('leave_conversation', (conversationId) => {
     if (conversationId) {
       socket.leave(`conversation_${conversationId}`);
@@ -439,20 +517,30 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    if (socket.userId) { connectedUsers.delete(socket.userId); console.log(`User ${socket.userId} disconnected`); }
+    if (socket.userId) {
+      connectedUsers.delete(socket.userId);
+      console.log(`User ${socket.userId} disconnected`);
+    }
   });
-   
+});
+
+// Helper function to send active conversations to admin
 async function sendActiveConversationsToAdmin(socket) {
   const connection = await pool.getConnection();
   try {
     const [conversations] = await connection.execute(
       `SELECT c.id, c.user_id, c.status, c.unread_admin, c.unread_user, c.last_message, c.last_message_time, c.created_at, c.updated_at,
               u.name as user_name, u.email as user_email, u.uid as user_uid
-       FROM chat_conversations c LEFT JOIN users u ON u.id = c.user_id
-       WHERE c.status = 'active' ORDER BY c.updated_at DESC LIMIT 50`
+       FROM chat_conversations c
+       LEFT JOIN users u ON u.id = c.user_id
+       WHERE c.status = 'active'
+       ORDER BY c.updated_at DESC
+       LIMIT 50`
     );
     socket.emit('admin_conversations', { conversations });
-  } finally { connection.release(); }
+  } finally {
+    connection.release();
+  }
 }
 
 
@@ -9280,6 +9368,7 @@ server.listen(PORT, async () => {
     const connection = await pool.getConnection();
     await connection.ping();
     connection.release();
+
 
     console.log(`✅ CryptoPulse backend running on port ${PORT}`);
     console.log(`✅ Socket.io enabled for real-time chat`);
