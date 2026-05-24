@@ -190,11 +190,11 @@ function getNotificationTone(type) {
   const value = String(type || "").toLowerCase();
 
   if (value === "verification_code") {
-    return "text-cyan-400";
+    return "text-lime-400";
   }
 
   if (value === "security") {
-    return "text-cyan-300";
+    return "text-lime-300";
   }
 
   if (value === "funds") {
@@ -410,8 +410,8 @@ export default function TransactionsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#050812] p-4 text-white">
-        <div className="rounded-[24px] border border-white/10 bg-[#0a0e1a] p-5 text-sm text-slate-400">
+      <div className="min-h-screen bg-black p-4 text-white">
+        <div className="rounded-[24px] border border-white/10 bg-[#111111] p-5 text-sm text-slate-400">
           Loading activity...
         </div>
       </div>
@@ -419,7 +419,7 @@ export default function TransactionsPage() {
   }
 
   return (
-    <div className="min-h-screen space-y-5 bg-[#050812] p-4 text-white">
+    <div className="min-h-screen space-y-5 bg-black p-4 text-white">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Activity</h1>
@@ -458,8 +458,8 @@ export default function TransactionsPage() {
             onClick={() => setTab(item.key)}
             className={`rounded-xl px-2 py-2.5 text-[11px] font-medium sm:text-sm ${
               tab === item.key
-                ? "bg-cyan-500 text-black"
-                : "border border-white/10 bg-[#111] text-slate-300"
+                ? "bg-lime-400 text-black"
+                : "border border-white/10 bg-[#111111] text-slate-300"
             }`}
           >
             <div>{item.label}</div>
@@ -482,7 +482,7 @@ export default function TransactionsPage() {
                   key={item.id}
                   type="button"
                   onClick={() => handleNotificationClick(item)}
-                  className="block w-full rounded-[22px] border border-white/10 bg-[#0a0e1a] p-4 text-left transition hover:bg-[#151515]"
+                  className="block w-full rounded-[22px] border border-white/10 bg-[#111111] p-4 text-left transition hover:bg-[#1a1a1a]"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 items-start gap-3">
@@ -497,7 +497,7 @@ export default function TransactionsPage() {
                           </div>
 
                           {Number(item.is_read || 0) !== 1 ? (
-                            <span className="rounded-full bg-cyan-500 px-2 py-0.5 text-[10px] font-semibold text-black">
+                            <span className="rounded-full bg-lime-400 px-2 py-0.5 text-[10px] font-semibold text-black">
                               New
                             </span>
                           ) : null}
@@ -540,7 +540,7 @@ export default function TransactionsPage() {
             return (
               <div
                 key={item.id}
-                className="rounded-[22px] border border-white/10 bg-[#0a0e1a] p-4"
+                className="rounded-[22px] border border-white/10 bg-[#111111] p-4"
               >
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-3">
@@ -586,7 +586,7 @@ export default function TransactionsPage() {
       </div>
 
       {notifications.some((item) => Number(item.is_read || 0) !== 1) ? (
-        <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-300">
+        <div className="rounded-2xl border border-lime-500/20 bg-lime-500/10 px-4 py-3 text-sm text-lime-300">
           <div className="flex items-center gap-2">
             <CheckCircle2 size={16} />
             <span>Tap a message to mark it as read.</span>
