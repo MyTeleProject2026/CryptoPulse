@@ -265,6 +265,17 @@ export const adminApi = {
   updateSetting: (key, payload, token) =>
     api.put(`/api/admin/settings/${key}`, payload, authHeaders(token)),
 
+  // Add these to your adminApi object
+
+  assignUserToPrivatePlan: (planId, payload, token) =>
+    api.post(`/api/admin/fund-rules/${planId}/assign-user`, payload, authHeaders(token)),
+  
+  getAssignedUsers: (planId, token) =>
+    api.get(`/api/admin/fund-rules/${planId}/assigned-users`, authHeaders(token)),
+  
+  removeUserFromPrivatePlan: (planId, userId, token) =>
+    api.delete(`/api/admin/fund-rules/${planId}/remove-user/${userId}`, authHeaders(token)),
+
   /* ---------------- AUDIT LOGS ---------------- */
   getAuditLogs: (token) =>
     api.get("/api/admin/audit-logs", authHeaders(token)),
