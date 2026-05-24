@@ -223,6 +223,55 @@ requestProfitWithdrawal: (payload, token) =>
 
   getTransferHistory: (token) =>
     api.get("/api/user/transfers", authHeaders(token)),
+  
+  // Add these helper functions to your existing userApi object
+  
+  // Get user's QR code as base64 (clean version)
+  getMyQrCodeBase64: async (token) => {
+    const response = await fetch(`${API_BASE_URL}/api/user/qr-code`, {
+      headers: { Authorization: `Bearer ${getUserToken(token)}` }
+    });
+    const data = await response.json();
+    if (data.success && data.data?.qr_code_base64) {
+      return `data:image/png;base64,${data.data.qr_code_base64}`;
+    }
+    throw new Error("Failed to get QR code");
+  },
+
+  // Search user by UID (clean version)
+  searchUserByUid: async (uid, token) => {
+    const response = await fetch(`${API_BASE_URL}/api/user/by-uid/${uid}`, {
+      headers: { Authorization: `Bearer ${getUserToken(token)}` }
+    });
+    const data = await response.json();
+    if (data.success) return data.data;
+    throw new Error("User not found");
+  },
+
+  // Execute transfer (clean version)
+  executeTransfer: async (recipientUid, amount, note, token) => {
+    const response = await fetch(`${API_BASE_URL}/api/user/transfer`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getUserToken(token)}`
+      },
+      body: JSON.stringify({ recipientUid, amount: Number(amount), note: note || null })
+    });
+    const data = await response.json();
+    if (data.success) return data.data;
+    throw new Error(data.message || "Transfer failed");
+  },
+
+  // Get recent transfers (for history)
+  getRecentTransfers: async (token, limit = 10) => {
+    const response = await fetch(`${API_BASE_URL}/api/user/transfers?limit=${limit}`, {
+      headers: { Authorization: `Bearer ${getUserToken(token)}` }
+    });
+    const data = await response.json();
+    if (data.success) return data.data;
+    return [];
+  },
 };
 
 /* ---------------- MARKET ---------------- */
