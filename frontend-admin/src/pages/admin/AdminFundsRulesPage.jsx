@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Info, AlertTriangle, Lock, Unlock } from "lucide-react";
 import { adminApi, getApiErrorMessage } from "../../services/api";
-// ✅ ADDED: Import toast notification
 import { addToast, ToastContainer } from "../../components/ToastNotification";
 
 function StatCard({ title, value, tone = "text-white" }) {
@@ -35,6 +34,13 @@ const EMPTY_FORM = {
   max_daily_profit_percent: 0,
   user_limit_count: "",
   status: "active",
+  // ✅ NEW FIELDS
+  admin_note: "",
+  admin_note_background_image: "",
+  additional_notes: "",
+  disclaimer: "",
+  is_private: 0,
+  compound_percentage: 100,
 };
 
 export default function AdminFundsRulesPage() {
@@ -66,14 +72,12 @@ export default function AdminFundsRulesPage() {
       const res = await adminApi.getFundRules(token);
       setRules(Array.isArray(res.data?.data) ? res.data.data : []);
       
-      // ✅ ADDED: Toast notification for silent refresh
       if (!isInitial) {
         addToast("Fund rules refreshed successfully", "success");
       }
     } catch (err) {
       const errorMsg = getApiErrorMessage(err);
       setError(errorMsg);
-      // ✅ ADDED: Toast notification for error
       addToast(errorMsg, "error");
     } finally {
       setLoading(false);
@@ -117,13 +121,19 @@ export default function AdminFundsRulesPage() {
               ? null
               : Number(rule.user_limit_count),
           status: rule.status,
+          // ✅ NEW FIELDS
+          admin_note: rule.admin_note || null,
+          admin_note_background_image: rule.admin_note_background_image || null,
+          additional_notes: rule.additional_notes || null,
+          disclaimer: rule.disclaimer || null,
+          is_private: rule.is_private || 0,
+          compound_percentage: rule.compound_percentage || 100,
         },
         token
       );
 
       const successMsg = `${rule.name} updated successfully.`;
       setSuccess(successMsg);
-      // ✅ ADDED: Toast notification for save success
       addToast(successMsg, "success");
       await loadRules(false);
     } catch (err) {
@@ -136,7 +146,6 @@ export default function AdminFundsRulesPage() {
   }
 
   async function handleCreateRule() {
-    // ✅ ADDED: Validation with toast
     if (!createForm.name || !createForm.name.trim()) {
       const errorMsg = "Rule name is required";
       setError(errorMsg);
@@ -170,13 +179,19 @@ export default function AdminFundsRulesPage() {
               ? null
               : Number(createForm.user_limit_count),
           status: createForm.status,
+          // ✅ NEW FIELDS
+          admin_note: createForm.admin_note || null,
+          admin_note_background_image: createForm.admin_note_background_image || null,
+          additional_notes: createForm.additional_notes || null,
+          disclaimer: createForm.disclaimer || null,
+          is_private: createForm.is_private || 0,
+          compound_percentage: createForm.compound_percentage || 100,
         },
         token
       );
 
       const successMsg = "Fund rule created successfully.";
       setSuccess(successMsg);
-      // ✅ ADDED: Toast notification for create success
       addToast(successMsg, "success");
       setCreateForm(EMPTY_FORM);
       await loadRules(false);
@@ -201,7 +216,6 @@ export default function AdminFundsRulesPage() {
       await adminApi.deleteFundRule(id, token);
       const successMsg = `Fund rule #${id} deleted successfully.`;
       setSuccess(successMsg);
-      // ✅ ADDED: Toast notification for delete success
       addToast(successMsg, "success");
       await loadRules(false);
     } catch (err) {
@@ -239,7 +253,6 @@ export default function AdminFundsRulesPage() {
 
   return (
     <div className="space-y-5">
-      {/* ✅ ADDED: Toast Container */}
       <ToastContainer />
 
       <section className="rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(163,230,53,0.10),transparent_18%),linear-gradient(180deg,#081223_0%,#020617_100%)] p-5 shadow-xl">
@@ -252,7 +265,7 @@ export default function AdminFundsRulesPage() {
               Funds Rules
             </h1>
             <p className="mt-2 text-sm text-slate-400">
-              Adjust duration, limits, daily profit ranges, status, and deletion.
+              Adjust duration, limits, daily profit ranges, status, notes, private plans, and compound settings.
             </p>
           </div>
 
@@ -286,6 +299,7 @@ export default function AdminFundsRulesPage() {
         </div>
       ) : null}
 
+      {/* Create Form Section */}
       <section className="rounded-[24px] border border-white/10 bg-[#111111] p-4 shadow-xl">
         <h2 className="text-lg font-semibold text-white">Create Fund Rule</h2>
 
@@ -349,6 +363,69 @@ export default function AdminFundsRulesPage() {
           </select>
         </div>
 
+        {/* ✅ NEW FIELDS in Create Form */}
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <textarea
+            value={createForm.admin_note}
+            onChange={(e) => handleCreateChange("admin_note", e.target.value)}
+            placeholder="Admin Note (displayed to users with 'Read' button)"
+            rows="3"
+            className="rounded-xl border border-white/10 bg-slate-800 px-3 py-2 text-sm text-white outline-none"
+          />
+
+          <input
+            type="text"
+            value={createForm.admin_note_background_image}
+            onChange={(e) => handleCreateChange("admin_note_background_image", e.target.value)}
+            placeholder="Background Image URL for note popup"
+            className="rounded-xl border border-white/10 bg-slate-800 px-3 py-2 text-sm text-white outline-none"
+          />
+
+          <textarea
+            value={createForm.additional_notes}
+            onChange={(e) => handleCreateChange("additional_notes", e.target.value)}
+            placeholder="Additional Information"
+            rows="2"
+            className="rounded-xl border border-white/10 bg-slate-800 px-3 py-2 text-sm text-white outline-none"
+          />
+
+          <textarea
+            value={createForm.disclaimer}
+            onChange={(e) => handleCreateChange("disclaimer", e.target.value)}
+            placeholder="Disclaimer / Risk Warning"
+            rows="2"
+            className="rounded-xl border border-white/10 bg-slate-800 px-3 py-2 text-sm text-white outline-none"
+          />
+
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={createForm.is_private === 1}
+                onChange={(e) => handleCreateChange("is_private", e.target.checked ? 1 : 0)}
+                className="rounded border-white/10 bg-slate-800"
+              />
+              <span className="text-sm text-slate-300">Private Plan (only visible to selected users)</span>
+            </label>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm text-slate-300">Compound Percentage (%)</label>
+            <input
+              type="number"
+              min="0"
+              max="100"
+              step="1"
+              value={createForm.compound_percentage}
+              onChange={(e) => handleCreateChange("compound_percentage", e.target.value)}
+              className="w-full rounded-xl border border-white/10 bg-slate-800 px-3 py-2 text-sm text-white outline-none"
+            />
+            <p className="mt-1 text-[10px] text-slate-500">
+              % of daily profit that gets compounded. 100% = full compound, 0% = no compound.
+            </p>
+          </div>
+        </div>
+
         <button
           type="button"
           onClick={handleCreateRule}
@@ -359,6 +436,7 @@ export default function AdminFundsRulesPage() {
         </button>
       </section>
 
+      {/* Rules List */}
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         {rules.map((rule) => (
           <div
@@ -366,9 +444,14 @@ export default function AdminFundsRulesPage() {
             className="rounded-[24px] border border-white/10 bg-[#111111] p-4 shadow-xl"
           >
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold text-white">
-                {rule.name}
-              </h2>
+              <div className="flex items-center gap-2">
+                {rule.is_private === 1 && (
+                  <Lock size={14} className="text-amber-400" />
+                )}
+                <h2 className="text-lg font-semibold text-white">
+                  {rule.name}
+                </h2>
+              </div>
 
               <span
                 className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
@@ -469,6 +552,76 @@ export default function AdminFundsRulesPage() {
                   <option value="inactive">inactive</option>
                 </select>
               </div>
+
+              {/* ✅ NEW FIELDS in Edit Form */}
+              <div>
+                <label className="mb-2 block text-sm text-slate-300">Admin Note</label>
+                <textarea
+                  value={rule.admin_note || ""}
+                  onChange={(e) => handleChange(rule.id, "admin_note", e.target.value)}
+                  rows="3"
+                  className="w-full rounded-xl border border-white/10 bg-slate-800 px-3 py-2 text-sm text-white outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm text-slate-300">Note Background Image URL</label>
+                <input
+                  type="text"
+                  value={rule.admin_note_background_image || ""}
+                  onChange={(e) => handleChange(rule.id, "admin_note_background_image", e.target.value)}
+                  placeholder="https://example.com/background.jpg"
+                  className="w-full rounded-xl border border-white/10 bg-slate-800 px-3 py-2 text-sm text-white outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm text-slate-300">Additional Notes</label>
+                <textarea
+                  value={rule.additional_notes || ""}
+                  onChange={(e) => handleChange(rule.id, "additional_notes", e.target.value)}
+                  rows="2"
+                  className="w-full rounded-xl border border-white/10 bg-slate-800 px-3 py-2 text-sm text-white outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm text-slate-300">Disclaimer</label>
+                <textarea
+                  value={rule.disclaimer || ""}
+                  onChange={(e) => handleChange(rule.id, "disclaimer", e.target.value)}
+                  rows="2"
+                  className="w-full rounded-xl border border-white/10 bg-slate-800 px-3 py-2 text-sm text-white outline-none"
+                />
+              </div>
+
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={rule.is_private === 1}
+                    onChange={(e) => handleChange(rule.id, "is_private", e.target.checked ? 1 : 0)}
+                    className="rounded border-white/10 bg-slate-800"
+                  />
+                  <span className="text-sm text-slate-300">Private Plan</span>
+                </label>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm text-slate-300">Compound Percentage (%)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={rule.compound_percentage ?? 100}
+                  onChange={(e) => handleChange(rule.id, "compound_percentage", e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-slate-800 px-3 py-2 text-sm text-white outline-none"
+                />
+                <p className="mt-1 text-[10px] text-slate-500">
+                  % of daily profit that gets compounded into principal.
+                </p>
+              </div>
             </div>
 
             <div className="mt-4 rounded-2xl border border-white/10 bg-black/40 p-4 text-sm space-y-2">
@@ -489,6 +642,16 @@ export default function AdminFundsRulesPage() {
                 label="Usage Limit"
                 value={rule.user_limit_count == null ? "No limit" : rule.user_limit_count}
               />
+              {rule.compound_percentage !== undefined && (
+                <DetailRow
+                  label="Compound %"
+                  value={`${rule.compound_percentage}%`}
+                  valueClassName="text-cyan-300"
+                />
+              )}
+              {rule.is_private === 1 && (
+                <DetailRow label="Type" value="Private Plan" valueClassName="text-amber-300" />
+              )}
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-2">
