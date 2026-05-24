@@ -26,6 +26,11 @@ import {
 } from "../services/api";
 import { useNotification } from "../hooks/useNotification";
 
+// ✅ Import QR Scanner components
+import QRScanner from "../components/QRScanner";
+import TransferConfirmModal from "../components/TransferConfirmModal";
+import { getRecentContacts, addRecentContact } from "../utils/recentContacts";
+
 // ✅ FIX: Coin logos with proper icons and colors
 const COIN_LOGOS = {
   USDT: { icon: "₮", color: "#26A17B", name: "Tether" },
@@ -221,12 +226,11 @@ function HistoryRow({ title, date, amount, negative = false }) {
   );
 }
 
-// QR Transfer Modal Component (Keep your existing one, it already has lime green theme)
+// QR Transfer Modal Component - ENHANCED VERSION with OKX-style features
 function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
-  // ... keep your existing QR Transfer Modal code (it already has lime green theme)
-  // I'm not repeating it here to save space, but keep your existing one
   const [mode, setMode] = useState("send");
-  const [scanning, setScanning] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [scannedUser, setScannedUser] = useState(null);
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
@@ -236,10 +240,17 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
   const [qrCodeError, setQrCodeError] = useState(false);
   const [userUid, setUserUid] = useState("");
   const [userName, setUserName] = useState("");
+  const [recentContacts, setRecentContacts] = useState([]);
   
   const token = localStorage.getItem("userToken") || localStorage.getItem("token") || "";
   const { showSuccess, showError, showVoucher } = useNotification();
+
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://cryptopulse-4rhe.onrender.com";
+
+  // Load recent contacts on mount
+  useEffect(() => {
+    setRecentContacts(getRecentContacts());
+  }, []);
 
   useEffect(() => {
     if (isOpen && mode === "receive") {
@@ -271,19 +282,21 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
         setMyQrCode(data.data.qr_code_base64);
       } else {
         setQrCodeError(true);
+        console.error("QR code generation failed:", data);
       }
     } catch (err) {
       setQrCodeError(true);
+      console.error("Failed to load QR code:", err);
     }
   }
-
+  
   async function findUserByUid(uid) {
     if (!uid || uid.length < 5) {
       showError("Please enter a valid UID");
-      return;
+      return null;
     }
     try {
-      setScanning(true);
+      setLoading(true);
       const res = await fetch(`${API_BASE_URL}/api/user/by-uid/${uid}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -291,22 +304,59 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
       if (data.success) {
         setScannedUser(data.data);
         showSuccess(`Found user: ${data.data.name || data.data.email}`);
+        return data.data;
       } else {
-        showError("User not found.");
+        showError("User not found. Please check the UID.");
         setScannedUser(null);
+        return null;
       }
     } catch (err) {
       showError("Failed to find user");
       setScannedUser(null);
+      return null;
     } finally {
-      setScanning(false);
+      setLoading(false);
     }
+  }
+
+  // Handle QR scan success
+  async function handleQrScanSuccess(decodedText) {
+    try {
+      let uid = decodedText;
+      try {
+        const parsed = JSON.parse(decodedText);
+        if (parsed.uid) {
+          uid = parsed.uid;
+        } else if (parsed.type === "cryptopulse" && parsed.uid) {
+          uid = parsed.uid;
+        }
+      } catch {
+        uid = decodedText;
+      }
+      
+      const cleanUid = String(uid).trim().toUpperCase();
+      
+      if (cleanUid) {
+        const user = await findUserByUid(cleanUid);
+        if (user) {
+          addRecentContact(user);
+          setRecentContacts(getRecentContacts());
+        }
+      }
+    } catch (err) {
+      showError("Invalid QR code format");
+    }
+    setShowScanner(false);
   }
 
   function handleManualUidInput(e) {
     if (e.key === "Enter") {
       findUserByUid(e.target.value);
     }
+  }
+
+  function selectRecentContact(contact) {
+    findUserByUid(contact.uid);
   }
 
   async function handleSendTransfer() {
@@ -322,7 +372,13 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
       showError("Minimum transfer amount is 1 USDT");
       return;
     }
+    
+    setShowConfirm(true);
+  }
 
+  async function executeTransfer() {
+    if (!scannedUser) return false;
+    
     try {
       setLoading(true);
       const res = await fetch(`${API_BASE_URL}/api/user/transfer`, {
@@ -340,6 +396,7 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
       const data = await res.json();
       if (data.success) {
         showSuccess(`Successfully sent ${amount} USDT to ${scannedUser.name || scannedUser.email}`);
+        
         showVoucher({
           title: "Transfer Sent",
           type: "transfer",
@@ -352,16 +409,21 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
             created_at: new Date().toISOString(),
           },
         });
+        
         onTransferComplete?.();
+        setShowConfirm(false);
         onClose();
         setScannedUser(null);
         setAmount("");
         setNote("");
+        return true;
       } else {
         showError(data.message || "Transfer failed");
+        return false;
       }
     } catch (err) {
       showError("Transfer failed. Please try again.");
+      return false;
     } finally {
       setLoading(false);
     }
@@ -384,50 +446,234 @@ function QrTransferModal({ isOpen, onClose, onTransferComplete }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-5">
-        <div className="mb-4 flex items-center justify-between">
-          <div className="flex gap-2">
-            <button onClick={() => setMode("send")} className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${mode === "send" ? "bg-lime-400 text-black" : "bg-white/5 text-white"}`}>
-              <Send size={16} className="mr-1 inline" /> Send
-            </button>
-            <button onClick={() => setMode("receive")} className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${mode === "receive" ? "bg-lime-400 text-black" : "bg-white/5 text-white"}`}>
-              <QrCode size={16} className="mr-1 inline" /> Receive
+    <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+        <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex gap-2">
+              <button
+                onClick={() => setMode("send")}
+                className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                  mode === "send" ? "bg-lime-400 text-black" : "bg-white/5 text-white"
+                }`}
+              >
+                <Send size={16} className="mr-1 inline" />
+                Send
+              </button>
+              <button
+                onClick={() => setMode("receive")}
+                className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                  mode === "receive" ? "bg-lime-400 text-black" : "bg-white/5 text-white"
+                }`}
+              >
+                <QrCode size={16} className="mr-1 inline" />
+                Receive
+              </button>
+            </div>
+            <button onClick={onClose} className="text-slate-400 hover:text-white">
+              <X size={20} />
             </button>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white"><X size={20} /></button>
+
+          {mode === "send" && (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-white/10 bg-slate-800 p-4">
+                <label className="mb-2 block text-sm text-slate-400">
+                  Recipient's UID
+                </label>
+                <input
+                  type="text"
+                  placeholder="Enter recipient's UID (e.g., CP00000001)"
+                  className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none focus:border-lime-400"
+                  onKeyDown={handleManualUidInput}
+                />
+                <p className="mt-2 text-center text-xs text-slate-500">or</p>
+                
+                {/* Real QR Scanner button */}
+                <button
+                  onClick={() => setShowScanner(true)}
+                  className="mt-2 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-lime-400 py-3 text-sm font-semibold text-black transition hover:bg-lime-300"
+                >
+                  <Camera size={18} />
+                  Scan QR Code
+                </button>
+              </div>
+
+              {/* Recent Contacts Section */}
+              {recentContacts.length > 0 && (
+                <div className="rounded-xl border border-white/10 bg-slate-800 p-4">
+                  <label className="mb-2 block text-sm text-slate-400">
+                    Recent Contacts
+                  </label>
+                  <div className="space-y-2">
+                    {recentContacts.map((contact) => (
+                      <button
+                        key={contact.uid}
+                        onClick={() => selectRecentContact(contact)}
+                        className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-slate-900 p-3 text-left transition hover:bg-white/5"
+                      >
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-lime-400/20">
+                          <span className="text-lime-400 font-semibold">
+                            {contact.name?.[0]?.toUpperCase() || "U"}
+                          </span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-white truncate">
+                            {contact.name || contact.uid}
+                          </div>
+                          <div className="text-xs text-slate-500">
+                            UID: {contact.uid}
+                          </div>
+                        </div>
+                        <ChevronRight size={16} className="text-slate-500" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {loading && (
+                <div className="flex items-center justify-center py-4">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-lime-400 border-t-transparent" />
+                  <span className="ml-2 text-sm text-slate-400">Searching...</span>
+                </div>
+              )}
+
+              {scannedUser && (
+                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/20">
+                      <User size={18} className="text-emerald-300" />
+                    </div>
+                    <div>
+                      <div className="font-semibold text-white">
+                        {scannedUser.name || scannedUser.email}
+                      </div>
+                      <div className="text-xs text-slate-400">UID: {scannedUser.uid}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="mb-2 block text-sm text-slate-400">Amount (USDT)</label>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="Enter amount (minimum 1 USDT)"
+                  className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none focus:border-lime-400"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm text-slate-400">Note (Optional)</label>
+                <input
+                  type="text"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="Add a note"
+                  className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none focus:border-lime-400"
+                />
+              </div>
+
+              <button
+                onClick={handleSendTransfer}
+                disabled={loading || !scannedUser || !amount}
+                className="w-full rounded-xl bg-lime-400 py-3 font-semibold text-black transition hover:bg-lime-300 disabled:opacity-50"
+              >
+                {loading ? "Sending..." : `Send ${amount || "0"} USDT`}
+              </button>
+            </div>
+          )}
+
+          {mode === "receive" && (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-white/10 bg-slate-800 p-4 text-center">
+                <p className="text-sm text-slate-400">Share this QR code to receive payments</p>
+                
+                {myQrCode && !qrCodeError ? (
+                  <div className="mt-4 flex flex-col items-center">
+                    <img
+                      src={getFullImageUrl(myQrCode)}
+                      alt="Your QR Code"
+                      className="h-48 w-48 rounded-xl border border-white/10 bg-white p-2"
+                      onError={() => setQrCodeError(true)}
+                    />
+                    <button
+                      onClick={() => copyToClipboard(userUid)}
+                      className="mt-4 inline-flex items-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-sm text-white transition hover:bg-white/5"
+                    >
+                      {copied ? <Check size={16} /> : <Copy size={16} />}
+                      {copied ? "Copied!" : "Copy UID"}
+                    </button>
+                    <p className="mt-3 text-xs text-slate-500">
+                      Your UID: <span className="font-mono text-white">{userUid}</span>
+                    </p>
+                  </div>
+                ) : qrCodeError ? (
+                  <div className="mt-4 flex flex-col items-center">
+                    <div className="flex h-48 w-48 flex-col items-center justify-center rounded-xl border border-red-500/20 bg-red-500/10">
+                      <QrCode size={48} className="text-red-400 mb-2" />
+                      <p className="text-xs text-red-400">QR Code unavailable</p>
+                      <button
+                        onClick={loadMyQrCode}
+                        className="mt-3 rounded-lg bg-lime-400 px-3 py-1 text-xs text-black"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => copyToClipboard(userUid)}
+                      className="mt-4 inline-flex items-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-sm text-white transition hover:bg-white/5"
+                    >
+                      {copied ? <Check size={16} /> : <Copy size={16} />}
+                      {copied ? "Copied!" : "Copy UID"}
+                    </button>
+                    <p className="mt-3 text-xs text-slate-500">
+                      Your UID: <span className="font-mono text-white">{userUid}</span>
+                    </p>
+                  </div>
+                ) : (
+                  <div className="mt-4 flex h-48 items-center justify-center">
+                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-lime-400 border-t-transparent" />
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-xl border border-white/10 bg-slate-800 p-4">
+                <h3 className="text-sm font-semibold text-white">How to receive:</h3>
+                <ol className="mt-2 space-y-2 text-xs text-slate-400">
+                  <li>1. Share this QR code with the sender</li>
+                  <li>2. Or share your UID: <span className="font-mono text-white">{userUid}</span></li>
+                  <li>3. Funds will be credited instantly to your wallet</li>
+                </ol>
+              </div>
+            </div>
+          )}
         </div>
-
-        {mode === "send" && (
-          <div className="space-y-4">
-            <div className="rounded-xl border border-white/10 bg-slate-800 p-4">
-              <label className="mb-2 block text-sm text-slate-400">Recipient's UID</label>
-              <input type="text" placeholder="Enter recipient's UID" className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none focus:border-lime-400" onKeyDown={handleManualUidInput} />
-              <p className="mt-2 text-center text-xs text-slate-500">or</p>
-              <label className="mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-lime-400 py-3 text-sm font-semibold text-black transition hover:bg-lime-300">
-                <Camera size={18} /> Scan QR Code
-                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) { const uid = prompt("Enter the UID from the QR code:"); if (uid) findUserByUid(uid); } e.target.value = ""; }} />
-              </label>
-            </div>
-            {scanning && (<div className="flex items-center justify-center py-4"><div className="h-6 w-6 animate-spin rounded-full border-2 border-lime-400 border-t-transparent" /><span className="ml-2 text-sm text-slate-400">Searching...</span></div>)}
-            {scannedUser && (<div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/20"><User size={18} className="text-emerald-300" /></div><div><div className="font-semibold text-white">{scannedUser.name || scannedUser.email}</div><div className="text-xs text-slate-400">UID: {scannedUser.uid}</div></div></div></div>)}
-            <div><label className="mb-2 block text-sm text-slate-400">Amount (USDT)</label><input type="number" min="1" step="1" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Enter amount (minimum 1 USDT)" className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none focus:border-lime-400" /></div>
-            <div><label className="mb-2 block text-sm text-slate-400">Note (Optional)</label><input type="text" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Add a note" className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none focus:border-lime-400" /></div>
-            <button onClick={handleSendTransfer} disabled={loading || !scannedUser || !amount} className="w-full rounded-xl bg-lime-400 py-3 font-semibold text-black transition hover:bg-lime-300 disabled:opacity-50">{loading ? "Sending..." : `Send ${amount || "0"} USDT`}</button>
-          </div>
-        )}
-
-        {mode === "receive" && (
-          <div className="space-y-4">
-            <div className="rounded-xl border border-white/10 bg-slate-800 p-4 text-center">
-              <p className="text-sm text-slate-400">Share this QR code to receive payments</p>
-              {myQrCode && !qrCodeError ? (<div className="mt-4 flex flex-col items-center"><img src={getFullImageUrl(myQrCode)} alt="Your QR Code" className="h-48 w-48 rounded-xl border border-white/10 bg-white p-2" onError={() => setQrCodeError(true)} /><button onClick={() => copyToClipboard(userUid)} className="mt-4 inline-flex items-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-sm text-white transition hover:bg-white/5">{copied ? <Check size={16} /> : <Copy size={16} />}{copied ? "Copied!" : "Copy UID"}</button><p className="mt-3 text-xs text-slate-500">Your UID: <span className="font-mono text-white">{userUid}</span></p></div>) : qrCodeError ? (<div className="mt-4 flex flex-col items-center"><div className="flex h-48 w-48 flex-col items-center justify-center rounded-xl border border-red-500/20 bg-red-500/10"><QrCode size={48} className="text-red-400 mb-2" /><p className="text-xs text-red-400">QR Code unavailable</p><button onClick={loadMyQrCode} className="mt-3 rounded-lg bg-lime-400 px-3 py-1 text-xs text-black">Retry</button></div><button onClick={() => copyToClipboard(userUid)} className="mt-4 inline-flex items-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-sm text-white transition hover:bg-white/5">{copied ? <Check size={16} /> : <Copy size={16} />}{copied ? "Copied!" : "Copy UID"}</button><p className="mt-3 text-xs text-slate-500">Your UID: <span className="font-mono text-white">{userUid}</span></p></div>) : (<div className="mt-4 flex h-48 items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-2 border-lime-400 border-t-transparent" /></div>)}
-            </div>
-            <div className="rounded-xl border border-white/10 bg-slate-800 p-4"><h3 className="text-sm font-semibold text-white">How to receive:</h3><ol className="mt-2 space-y-2 text-xs text-slate-400"><li>1. Share this QR code with the sender</li><li>2. Or share your UID: <span className="font-mono text-white">{userUid}</span></li><li>3. Funds will be credited instantly to your wallet</li></ol></div>
-          </div>
-        )}
       </div>
-    </div>
+
+      {/* QR Scanner Modal */}
+      <QRScanner
+        isOpen={showScanner}
+        onClose={() => setShowScanner(false)}
+        onScanSuccess={handleQrScanSuccess}
+      />
+
+      {/* Confirmation Modal */}
+      <TransferConfirmModal
+        isOpen={showConfirm}
+        onClose={() => setShowConfirm(false)}
+        onConfirm={executeTransfer}
+        recipient={scannedUser}
+        amount={amount}
+        note={note}
+        isProcessing={loading}
+      />
+    </>
   );
 }
 
