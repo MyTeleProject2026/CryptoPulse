@@ -8552,32 +8552,63 @@ app.post("/api/admin/funds/:id/modify-profit-rate", authenticateAdmin, async (re
   }
 });
 
-// Get fund plans with private plan filtering
+// Get fund plans for users (with proper private plan filtering)
 app.get("/api/funds/plans", authenticateUser, async (req, res, next) => {
   try {
     const userId = req.user.id;
     
-    const [rows] = await pool.execute(
-      `SELECT 
-        fp.*
-       FROM fund_plans fp
-       WHERE fp.is_active = 1
-         AND (
-           fp.is_private = 0 
-           OR EXISTS (
-             SELECT 1 FROM user_plan_assignments upa 
-             WHERE upa.plan_id = fp.id AND upa.user_id = ?
-           )
-         )
-       ORDER BY fp.duration_days ASC`,
+    // Get IDs of plans assigned to this user
+    const [assignedPlans] = await pool.execute(
+      `SELECT plan_id FROM user_plan_assignments WHERE user_id = ?`,
       [userId]
     );
     
+    const assignedPlanIds = assignedPlans.map(p => p.plan_id);
+    
+    // Build query
+    let query = `
+      SELECT
+        id,
+        name,
+        duration_days,
+        min_amount,
+        max_amount,
+        min_daily_profit_percent,
+        max_daily_profit_percent,
+        user_limit_count,
+        is_active,
+        admin_note,
+        admin_note_background_image,
+        additional_notes,
+        disclaimer,
+        is_private,
+        compound_percentage
+      FROM fund_plans
+      WHERE is_active = 1
+    `;
+    
+    const params = [];
+    
+    // ✅ FIX: Filter private plans correctly
+    if (assignedPlanIds.length > 0) {
+      // User has some assigned private plans
+      query += ` AND (is_private = 0 OR id IN (${assignedPlanIds.map(() => '?').join(',')}))`;
+      params.push(...assignedPlanIds);
+    } else {
+      // User has NO assigned private plans - only show public plans
+      query += ` AND is_private = 0`;
+    }
+    
+    query += ` ORDER BY duration_days ASC, id ASC`;
+    
+    const [rows] = await pool.execute(query, params);
+
     res.json({
       success: true,
       data: rows,
     });
   } catch (error) {
+    console.error("Get fund plans error:", error);
     next(error);
   }
 });
@@ -8950,7 +8981,7 @@ app.delete("/api/admin/fund-rules/:id", authenticateAdmin, async (req, res, next
 });
 
 
-// Assign private plan to specific user (admin only)
+// Assign private plan to specific user
 app.post("/api/admin/fund-rules/:planId/assign-user", authenticateAdmin, async (req, res, next) => {
   try {
     const planId = Number(req.params.planId);
@@ -8965,7 +8996,7 @@ app.post("/api/admin/fund-rules/:planId/assign-user", authenticateAdmin, async (
     
     // Check if plan exists and is private
     const [planRows] = await pool.execute(
-      `SELECT id, is_private FROM fund_plans WHERE id = ?`,
+      `SELECT id, name, is_private FROM fund_plans WHERE id = ?`,
       [planId]
     );
     
@@ -8973,6 +9004,19 @@ app.post("/api/admin/fund-rules/:planId/assign-user", authenticateAdmin, async (
       return res.status(404).json({
         success: false,
         message: "Plan not found",
+      });
+    }
+    
+    // Check if user exists
+    const [userRows] = await pool.execute(
+      `SELECT id, uid, email FROM users WHERE id = ?`,
+      [userId]
+    );
+    
+    if (!userRows.length) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
       });
     }
     
@@ -8988,12 +9032,12 @@ app.post("/api/admin/fund-rules/:planId/assign-user", authenticateAdmin, async (
       action: "assign_private_plan",
       targetUserId: userId,
       referenceId: planId,
-      note: `Assigned private plan #${planId} to user #${userId}`,
+      note: `Assigned private plan "${planRows[0].name}" to user ${userRows[0].email}`,
     });
     
     res.json({
       success: true,
-      message: "Private plan assigned to user successfully",
+      message: `Private plan "${planRows[0].name}" assigned to user ${userRows[0].email} successfully`,
     });
   } catch (error) {
     console.error("Assign private plan error:", error);
@@ -9001,6 +9045,57 @@ app.post("/api/admin/fund-rules/:planId/assign-user", authenticateAdmin, async (
   }
 });
 
+// Get users assigned to a private plan
+app.get("/api/admin/fund-rules/:planId/assigned-users", authenticateAdmin, async (req, res, next) => {
+  try {
+    const planId = Number(req.params.planId);
+    
+    const [rows] = await pool.execute(
+      `SELECT upa.*, u.uid, u.name, u.email
+       FROM user_plan_assignments upa
+       JOIN users u ON u.id = upa.user_id
+       WHERE upa.plan_id = ?`,
+      [planId]
+    );
+    
+    res.json({
+      success: true,
+      data: rows,
+    });
+  } catch (error) {
+    console.error("Get assigned users error:", error);
+    next(error);
+  }
+});
+
+// Remove user from private plan
+app.delete("/api/admin/fund-rules/:planId/remove-user/:userId", authenticateAdmin, async (req, res, next) => {
+  try {
+    const planId = Number(req.params.planId);
+    const userId = Number(req.params.userId);
+    
+    await pool.execute(
+      `DELETE FROM user_plan_assignments WHERE plan_id = ? AND user_id = ?`,
+      [planId, userId]
+    );
+    
+    await createAuditLog(pool, {
+      adminId: req.admin.id,
+      action: "remove_private_plan_assignment",
+      targetUserId: userId,
+      referenceId: planId,
+      note: `Removed user #${userId} from private plan #${planId}`,
+    });
+    
+    res.json({
+      success: true,
+      message: "User removed from private plan successfully",
+    });
+  } catch (error) {
+    console.error("Remove user from plan error:", error);
+    next(error);
+  }
+});
 /* =========================
    ADMIN NOTIFICATIONS
 ========================= */
