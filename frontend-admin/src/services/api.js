@@ -157,20 +157,20 @@ export const adminApi = {
     }),
 
   // Add inside your existing adminApi object
-getWithdrawalSettings: (token) =>
-  api.get("/api/withdrawal-settings", authHeaders(token)),
-
-updateWithdrawalSettings: (payload, token) =>
-  api.put("/api/admin/withdrawal-settings", payload, authHeaders(token)),
-
-getProfitWithdrawalRequests: (token) =>
-  api.get("/api/admin/profit-withdrawal-requests", authHeaders(token)),
-
-approveProfitWithdrawal: (id, token) =>
-  api.post(`/api/admin/profit-withdrawal-requests/${id}/approve`, {}, authHeaders(token)),
-
-rejectProfitWithdrawal: (id, token) =>
-  api.post(`/api/admin/profit-withdrawal-requests/${id}/reject`, {}, authHeaders(token)),
+  getWithdrawalSettings: (token) =>
+    api.get("/api/withdrawal-settings", authHeaders(token)),
+  
+  updateWithdrawalSettings: (payload, token) =>
+    api.put("/api/admin/withdrawal-settings", payload, authHeaders(token)),
+  
+  getProfitWithdrawalRequests: (token) =>
+    api.get("/api/admin/profit-withdrawal-requests", authHeaders(token)),
+  
+  approveProfitWithdrawal: (id, token) =>
+    api.post(`/api/admin/profit-withdrawal-requests/${id}/approve`, {}, authHeaders(token)),
+  
+  rejectProfitWithdrawal: (id, token) =>
+    api.post(`/api/admin/profit-withdrawal-requests/${id}/reject`, {}, authHeaders(token)),
 
   /* ---------------- WITHDRAWALS ---------------- */
   getWithdrawals: (token) =>
@@ -234,6 +234,16 @@ rejectProfitWithdrawal: (id, token) =>
 
   cancelFund: (id, payload = {}, token) =>
     api.post(`/api/admin/funds/${id}/cancel`, payload, authHeaders(token)),
+
+  // Add these methods to adminApi object
+  pauseFund: (id, payload, token) =>
+    api.post(`/api/admin/funds/${id}/pause`, payload, authHeaders(token)),
+  
+  resumeFund: (id, payload, token) =>
+    api.post(`/api/admin/funds/${id}/resume`, payload, authHeaders(token)),
+  
+  modifyFundProfitRate: (id, payload, token) =>
+    api.post(`/api/admin/funds/${id}/modify-profit-rate`, payload, authHeaders(token)),
 
   /* ---------------- FUND RULES ---------------- */
   getFundRules: (token) =>
