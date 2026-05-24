@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { RefreshCw, Info, AlertTriangle, Lock, Unlock } from "lucide-react";
+import { RefreshCw, Info, AlertTriangle, Lock, Unlock, UserPlus, UserMinus, Users } from "lucide-react";
 import { adminApi, getApiErrorMessage } from "../../services/api";
 import { addToast, ToastContainer } from "../../components/ToastNotification";
 
@@ -25,6 +25,104 @@ function DetailRow({ label, value, valueClassName = "text-white" }) {
   );
 }
 
+// ✅ User Assignment Modal Component
+function UserAssignmentModal({ isOpen, onClose, plan, onAssign, onRemove, assignedUsers, onRefresh }) {
+  const [userId, setUserId] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  if (!isOpen || !plan) return null;
+
+  const handleAssign = async () => {
+    if (!userId) {
+      addToast("Please enter a User ID", "error");
+      return;
+    }
+    setLoading(true);
+    await onAssign(plan.id, userId);
+    setUserId("");
+    setLoading(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#111111] p-5 shadow-2xl">
+        <div className="flex items-center justify-between border-b border-white/10 pb-3">
+          <div className="flex items-center gap-2">
+            <Users size={18} className="text-lime-400" />
+            <h2 className="text-lg font-bold text-white">Assign Users to Plan</h2>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-white">
+            ✕
+          </button>
+        </div>
+
+        <div className="pt-4">
+          <p className="text-sm text-slate-300 mb-3">
+            Plan: <span className="font-semibold text-white">{plan.name}</span>
+          </p>
+          
+          {/* Assigned Users List */}
+          <div className="mb-4">
+            <label className="mb-2 block text-sm text-slate-300">Assigned Users</label>
+            <div className="max-h-40 overflow-y-auto space-y-2 rounded-xl border border-white/10 bg-black/40 p-3">
+              {assignedUsers.length === 0 ? (
+                <p className="text-xs text-slate-500 text-center">No users assigned yet</p>
+              ) : (
+                assignedUsers.map((user) => (
+                  <div key={user.id} className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-slate-800/50 p-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-semibold text-white truncate">{user.name || user.email}</div>
+                      <div className="text-xs text-slate-400">UID: {user.uid} | ID: {user.user_id}</div>
+                    </div>
+                    <button
+                      onClick={() => onRemove(plan.id, user.user_id)}
+                      className="rounded-lg bg-red-500/10 px-2 py-1 text-xs font-semibold text-red-300 transition hover:bg-red-500/20"
+                    >
+                      <UserMinus size={14} className="inline mr-1" />
+                      Remove
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Add User Section */}
+          <div>
+            <label className="mb-2 block text-sm text-slate-300">Add User by ID</label>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                value={userId}
+                onChange={(e) => setUserId(e.target.value)}
+                placeholder="Enter User ID (e.g., 123)"
+                className="flex-1 rounded-lg border border-white/10 bg-slate-800 px-3 py-2 text-sm text-white outline-none focus:border-lime-400"
+              />
+              <button
+                onClick={handleAssign}
+                disabled={loading}
+                className="rounded-lg bg-lime-400 px-4 py-2 text-sm font-semibold text-black transition hover:bg-lime-300 disabled:opacity-50"
+              >
+                <UserPlus size={16} className="inline mr-1" />
+                Add
+              </button>
+            </div>
+            <p className="mt-2 text-[10px] text-slate-500">
+              Only assigned users will see this private plan on their Funds page.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-5 flex justify-end">
+          <button onClick={onClose} className="rounded-lg border border-white/10 px-4 py-2 text-sm text-white">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const EMPTY_FORM = {
   name: "",
   duration_days: 2,
@@ -34,7 +132,6 @@ const EMPTY_FORM = {
   max_daily_profit_percent: 0,
   user_limit_count: "",
   status: "active",
-  // ✅ NEW FIELDS
   admin_note: "",
   admin_note_background_image: "",
   additional_notes: "",
@@ -57,6 +154,12 @@ export default function AdminFundsRulesPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [createForm, setCreateForm] = useState(EMPTY_FORM);
+  
+  // ✅ User Assignment Modal State
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState(null);
+  const [assignedUsers, setAssignedUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
 
   useEffect(() => {
     loadRules(true);
@@ -82,6 +185,51 @@ export default function AdminFundsRulesPage() {
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  }
+
+  // ✅ Load assigned users for a plan
+  async function loadAssignedUsers(planId) {
+    try {
+      setLoadingUsers(true);
+      const res = await adminApi.getAssignedUsers(planId, token);
+      setAssignedUsers(Array.isArray(res.data?.data) ? res.data.data : []);
+    } catch (err) {
+      console.error("Failed to load assigned users:", err);
+      setAssignedUsers([]);
+    } finally {
+      setLoadingUsers(false);
+    }
+  }
+
+  // ✅ Open user assignment modal
+  async function openUserModal(rule) {
+    setSelectedPlan(rule);
+    await loadAssignedUsers(rule.id);
+    setShowUserModal(true);
+  }
+
+  // ✅ Assign user to private plan
+  async function assignUserToPlan(planId, userId) {
+    try {
+      await adminApi.assignUserToPrivatePlan(planId, { userId }, token);
+      addToast("User assigned successfully", "success");
+      await loadAssignedUsers(planId);
+      await loadRules(false);
+    } catch (err) {
+      addToast(getApiErrorMessage(err), "error");
+    }
+  }
+
+  // ✅ Remove user from private plan
+  async function removeUserFromPlan(planId, userId) {
+    try {
+      await adminApi.removeUserFromPrivatePlan(planId, userId, token);
+      addToast("User removed successfully", "success");
+      await loadAssignedUsers(planId);
+      await loadRules(false);
+    } catch (err) {
+      addToast(getApiErrorMessage(err), "error");
     }
   }
 
@@ -121,7 +269,6 @@ export default function AdminFundsRulesPage() {
               ? null
               : Number(rule.user_limit_count),
           status: rule.status,
-          // ✅ NEW FIELDS
           admin_note: rule.admin_note || null,
           admin_note_background_image: rule.admin_note_background_image || null,
           additional_notes: rule.additional_notes || null,
@@ -179,7 +326,6 @@ export default function AdminFundsRulesPage() {
               ? null
               : Number(createForm.user_limit_count),
           status: createForm.status,
-          // ✅ NEW FIELDS
           admin_note: createForm.admin_note || null,
           admin_note_background_image: createForm.admin_note_background_image || null,
           additional_notes: createForm.additional_notes || null,
@@ -254,6 +400,21 @@ export default function AdminFundsRulesPage() {
   return (
     <div className="space-y-5">
       <ToastContainer />
+
+      {/* User Assignment Modal */}
+      <UserAssignmentModal
+        isOpen={showUserModal}
+        onClose={() => {
+          setShowUserModal(false);
+          setSelectedPlan(null);
+          setAssignedUsers([]);
+        }}
+        plan={selectedPlan}
+        onAssign={assignUserToPlan}
+        onRemove={removeUserFromPlan}
+        assignedUsers={assignedUsers}
+        onRefresh={() => selectedPlan && loadAssignedUsers(selectedPlan.id)}
+      />
 
       <section className="rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(163,230,53,0.10),transparent_18%),linear-gradient(180deg,#081223_0%,#020617_100%)] p-5 shadow-xl">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -363,7 +524,6 @@ export default function AdminFundsRulesPage() {
           </select>
         </div>
 
-        {/* ✅ NEW FIELDS in Create Form */}
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <textarea
             value={createForm.admin_note}
@@ -553,7 +713,6 @@ export default function AdminFundsRulesPage() {
                 </select>
               </div>
 
-              {/* ✅ NEW FIELDS in Edit Form */}
               <div>
                 <label className="mb-2 block text-sm text-slate-300">Admin Note</label>
                 <textarea
@@ -653,6 +812,17 @@ export default function AdminFundsRulesPage() {
                 <DetailRow label="Type" value="Private Plan" valueClassName="text-amber-300" />
               )}
             </div>
+
+            {/* ✅ User Assignment Button for Private Plans */}
+            {rule.is_private === 1 && (
+              <button
+                onClick={() => openUserModal(rule)}
+                className="mt-3 w-full rounded-lg bg-cyan-500/10 py-2 text-xs font-semibold text-cyan-300 transition hover:bg-cyan-500/20"
+              >
+                <Users size={14} className="inline mr-1" />
+                Manage Assigned Users
+              </button>
+            )}
 
             <div className="mt-4 grid grid-cols-2 gap-2">
               <button
