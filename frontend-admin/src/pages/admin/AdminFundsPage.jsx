@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Pause, Play, TrendingUp } from "lucide-react";
 import { adminApi, getApiErrorMessage } from "../../services/api";
-// ✅ ADDED: Import toast notification
 import { addToast, ToastContainer } from "../../components/ToastNotification";
 
 function formatMoney(value) {
@@ -50,6 +49,9 @@ function getStatusClass(status) {
   if (value === "active") {
     return "bg-amber-500/10 text-amber-300 border border-amber-500/20";
   }
+  if (value === "paused") {
+    return "bg-red-500/10 text-red-300 border border-red-500/20";
+  }
   if (value === "completed") {
     return "bg-emerald-500/10 text-emerald-300 border border-emerald-500/20";
   }
@@ -79,6 +81,8 @@ export default function AdminFundsPage() {
   const [actionId, setActionId] = useState(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [profitRateEditId, setProfitRateEditId] = useState(null);
+  const [profitRateValue, setProfitRateValue] = useState("");
 
   useEffect(() => {
     loadFunds(true);
@@ -99,14 +103,12 @@ export default function AdminFundsPage() {
       setFunds(Array.isArray(fundsRes.data?.data) ? fundsRes.data.data : []);
       setSummary(summaryRes.data?.data || {});
       
-      // ✅ ADDED: Toast notification for silent refresh
       if (!isInitial) {
         addToast("Funds refreshed successfully", "success");
       }
     } catch (err) {
       const errorMsg = getApiErrorMessage(err);
       setError(errorMsg);
-      // ✅ ADDED: Toast notification for error
       addToast(errorMsg, "error");
     } finally {
       setLoading(false);
@@ -126,7 +128,6 @@ export default function AdminFundsPage() {
       await adminApi.deleteFund(id, token);
       const successMsg = `Fund #${id} deleted successfully.`;
       setSuccess(successMsg);
-      // ✅ ADDED: Toast notification for delete success
       addToast(successMsg, "success");
       await loadFunds(false);
     } catch (err) {
@@ -150,7 +151,6 @@ export default function AdminFundsPage() {
       await adminApi.completeFund(id, {}, token);
       const successMsg = `Fund #${id} completed successfully.`;
       setSuccess(successMsg);
-      // ✅ ADDED: Toast notification for complete success
       addToast(successMsg, "success");
       await loadFunds(false);
     } catch (err) {
@@ -174,7 +174,6 @@ export default function AdminFundsPage() {
       await adminApi.cancelFund(id, {}, token);
       const successMsg = `Fund #${id} cancelled successfully.`;
       setSuccess(successMsg);
-      // ✅ ADDED: Toast notification for cancel success
       addToast(successMsg, "success");
       await loadFunds(false);
     } catch (err) {
@@ -186,12 +185,87 @@ export default function AdminFundsPage() {
     }
   }
 
+  // ✅ NEW: Pause Fund
+  async function handlePauseFund(id) {
+    const confirmed = window.confirm(`Pause fund #${id}? Daily profits will stop accruing.`);
+    if (!confirmed) return;
+
+    try {
+      setActionId(id);
+      setError("");
+      setSuccess("");
+
+      await adminApi.pauseFund(id, {}, token);
+      const successMsg = `Fund #${id} paused successfully.`;
+      setSuccess(successMsg);
+      addToast(successMsg, "success");
+      await loadFunds(false);
+    } catch (err) {
+      const errorMsg = getApiErrorMessage(err);
+      setError(errorMsg);
+      addToast(errorMsg, "error");
+    } finally {
+      setActionId(null);
+    }
+  }
+
+  // ✅ NEW: Resume Fund
+  async function handleResumeFund(id) {
+    const confirmed = window.confirm(`Resume fund #${id}? Daily profits will resume.`);
+    if (!confirmed) return;
+
+    try {
+      setActionId(id);
+      setError("");
+      setSuccess("");
+
+      await adminApi.resumeFund(id, {}, token);
+      const successMsg = `Fund #${id} resumed successfully.`;
+      setSuccess(successMsg);
+      addToast(successMsg, "success");
+      await loadFunds(false);
+    } catch (err) {
+      const errorMsg = getApiErrorMessage(err);
+      setError(errorMsg);
+      addToast(errorMsg, "error");
+    } finally {
+      setActionId(null);
+    }
+  }
+
+  // ✅ NEW: Modify Profit Rate
+  async function handleModifyProfitRate(id, newRate) {
+    const confirmed = window.confirm(`Change profit rate for fund #${id} to ${newRate}%?`);
+    if (!confirmed) return;
+
+    try {
+      setActionId(id);
+      setError("");
+      setSuccess("");
+
+      await adminApi.modifyFundProfitRate(id, { profit_rate: newRate }, token);
+      const successMsg = `Fund #${id} profit rate changed to ${newRate}%.`;
+      setSuccess(successMsg);
+      addToast(successMsg, "success");
+      await loadFunds(false);
+    } catch (err) {
+      const errorMsg = getApiErrorMessage(err);
+      setError(errorMsg);
+      addToast(errorMsg, "error");
+    } finally {
+      setActionId(null);
+      setProfitRateEditId(null);
+    }
+  }
+
   const stats = useMemo(() => {
     return {
       total: Number(summary.total_funds || funds.length || 0),
       active:
         Number(summary.active_funds || 0) ||
         funds.filter((item) => String(item.status).toLowerCase() === "active").length,
+      paused:
+        funds.filter((item) => String(item.status).toLowerCase() === "paused").length,
       completed:
         Number(summary.completed_funds || 0) ||
         funds.filter((item) => String(item.status).toLowerCase() === "completed").length,
@@ -210,7 +284,6 @@ export default function AdminFundsPage() {
 
   return (
     <div className="space-y-5">
-      {/* ✅ ADDED: Toast Container */}
       <ToastContainer />
 
       <section className="rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(163,230,53,0.10),transparent_18%),linear-gradient(180deg,#081223_0%,#020617_100%)] p-5 shadow-xl">
@@ -223,7 +296,7 @@ export default function AdminFundsPage() {
               Funds Control
             </h1>
             <p className="mt-2 text-sm text-slate-400">
-              Monitor active user funds, profits, completion, cancellation, and deletion.
+              Monitor active user funds, profits, pause/resume, modify profit rates, completion, cancellation, and deletion.
             </p>
           </div>
 
@@ -238,9 +311,10 @@ export default function AdminFundsPage() {
         </div>
       </section>
 
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
         <StatCard title="Total Funds" value={stats.total} />
         <StatCard title="Active" value={stats.active} tone="text-amber-300" />
+        <StatCard title="Paused" value={stats.paused} tone="text-red-300" />
         <StatCard title="Completed" value={stats.completed} tone="text-emerald-300" />
         <StatCard
           title="Funded Amount"
@@ -276,6 +350,7 @@ export default function AdminFundsPage() {
             const fundStatus = String(fund.status || "").toLowerCase();
             const isCompleted = fundStatus === "completed";
             const isCancelled = fundStatus === "cancelled";
+            const isPaused = fundStatus === "paused";
             const disableComplete = actionId === fund.id || isCompleted || isCancelled;
             const disableCancel = actionId === fund.id || isCompleted || isCancelled;
 
@@ -309,6 +384,11 @@ export default function AdminFundsPage() {
                       value={`${Number(fund.selected_daily_profit_percent || 0).toFixed(2)}%`}
                     />
                     <DetailBox
+                      label="Compound %"
+                      value={`${Number(fund.compound_percentage || 100).toFixed(0)}%`}
+                      valueClassName="text-cyan-300"
+                    />
+                    <DetailBox
                       label="Progress"
                       value={`${fund.current_day || 0}/${fund.total_days || 0}`}
                     />
@@ -339,6 +419,74 @@ export default function AdminFundsPage() {
                   </div>
 
                   <div className="flex flex-col gap-2 sm:flex-row">
+                    {/* Pause/Resume Buttons */}
+                    {fundStatus === "active" && (
+                      <button
+                        type="button"
+                        disabled={actionId === fund.id}
+                        onClick={() => handlePauseFund(fund.id)}
+                        className="rounded-xl bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-300 transition hover:bg-amber-500/20 disabled:opacity-50"
+                      >
+                        {actionId === fund.id ? "..." : <Pause size={14} className="inline mr-1" />}
+                        Pause
+                      </button>
+                    )}
+
+                    {fundStatus === "paused" && (
+                      <button
+                        type="button"
+                        disabled={actionId === fund.id}
+                        onClick={() => handleResumeFund(fund.id)}
+                        className="rounded-xl bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-300 transition hover:bg-emerald-500/20 disabled:opacity-50"
+                      >
+                        {actionId === fund.id ? "..." : <Play size={14} className="inline mr-1" />}
+                        Resume
+                      </button>
+                    )}
+
+                    {/* Modify Profit Rate Button */}
+                    {fundStatus === "active" && (
+                      <div className="flex items-center gap-1">
+                        {profitRateEditId === fund.id ? (
+                          <>
+                            <input
+                              type="number"
+                              step="0.1"
+                              value={profitRateValue}
+                              onChange={(e) => setProfitRateValue(e.target.value)}
+                              className="w-16 rounded-lg border border-white/10 bg-slate-800 px-1 py-1 text-xs text-white"
+                            />
+                            <button
+                              onClick={() => {
+                                handleModifyProfitRate(fund.id, Number(profitRateValue));
+                                setProfitRateEditId(null);
+                              }}
+                              className="rounded-lg bg-lime-400 px-2 py-1 text-xs font-semibold text-black"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => setProfitRateEditId(null)}
+                              className="rounded-lg border border-white/10 px-2 py-1 text-xs text-white"
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setProfitRateEditId(fund.id);
+                              setProfitRateValue(fund.selected_daily_profit_percent || 0);
+                            }}
+                            className="rounded-xl bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-300 transition hover:bg-cyan-500/20"
+                          >
+                            <TrendingUp size={14} className="inline mr-1" />
+                            Change Rate
+                          </button>
+                        )}
+                      </div>
+                    )}
+
                     <button
                       type="button"
                       disabled={disableComplete}
@@ -349,7 +497,7 @@ export default function AdminFundsPage() {
                           : "bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
                       }`}
                     >
-                      {actionId === fund.id ? "Processing..." : "Complete"}
+                      {actionId === fund.id ? "..." : "Complete"}
                     </button>
 
                     <button
@@ -362,7 +510,7 @@ export default function AdminFundsPage() {
                           : "bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
                       }`}
                     >
-                      {actionId === fund.id ? "Processing..." : "Cancel"}
+                      {actionId === fund.id ? "..." : "Cancel"}
                     </button>
 
                     <button
@@ -371,7 +519,7 @@ export default function AdminFundsPage() {
                       onClick={() => handleDeleteFund(fund.id)}
                       className="rounded-xl bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-300 transition hover:bg-rose-500/20 disabled:opacity-50"
                     >
-                      {actionId === fund.id ? "Processing..." : "Delete"}
+                      {actionId === fund.id ? "..." : "Delete"}
                     </button>
                   </div>
                 </div>
@@ -385,6 +533,12 @@ export default function AdminFundsPage() {
                 {isCancelled ? (
                   <div className="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
                     This fund is already cancelled. You can delete it if needed.
+                  </div>
+                ) : null}
+
+                {isPaused ? (
+                  <div className="mt-3 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+                    This fund is paused. Daily profits are on hold. Click "Resume" to reactivate.
                   </div>
                 ) : null}
               </div>
